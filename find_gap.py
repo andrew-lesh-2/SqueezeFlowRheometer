@@ -108,7 +108,6 @@ def actuator_thread():
 
     approach_velocity = -0.5  # mm/s, speed to approach hard stop at
     force_threshold = 0.8  # g, the force to look for when you hit something
-    max_force = 80  # g, if force greater than this, stop test.
     backoff_dist = 0.1  # mm, distance to back away when you hit
 
     hit_pos = 0
@@ -122,7 +121,7 @@ def actuator_thread():
     while True:
         # print("{:6.2f} <? {:6.2f}".format(force, force_threshold))
         actuator.heartbeat()
-        if abs(force) > max_force:
+        if abs(force) > scale.force_limit:
             print("Force was too large, stopping.")
             actuator.go_home_quiet_down()
             return
@@ -142,7 +141,7 @@ def actuator_thread():
         actuator.set_vel_mms(approach_velocity * slowdown_factor)
         while True:
             # Check if force beyond max amount
-            if abs(force) > max_force:
+            if abs(force) > scale.force_limit:
                 print("Force was too large, stopping.")
                 actuator.go_home_quiet_down()
                 return

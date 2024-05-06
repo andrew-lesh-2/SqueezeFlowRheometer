@@ -207,9 +207,8 @@ def actuator_thread():
 
     actuator.startup()
 
-    approach_velocity = -1  # mm/s, speed to approach bath of fluid at
+    approach_velocity = -0.2  # mm/s, speed to approach bath of fluid at
     force_threshold = 0.6  # g, force must exceed this for control system to kick in.
-    max_force = 80  # g, if force greater than this, stop test.
 
     backoff_velocity = 1  # mm/s
 
@@ -217,7 +216,7 @@ def actuator_thread():
     actuator.set_vel_mms(approach_velocity)
     while True:
         actuator.heartbeat()
-        if abs(force) > max_force:
+        if abs(force) > scale.force_limit:
             test_active = False
             actuator.go_home_quiet_down()
             break
@@ -261,11 +260,19 @@ def actuator_thread():
     mute_derivative_term_steps_max = 100
     while True:
         # Check if force beyond max amount
-        if abs(force) > max_force:
+        if abs(force) > scale.force_limit:
             print(
                 "Force was too large, stopping - {:3.2f}{:}".format(force, scale.units)
             )
             test_active = False
+
+            # Save fig out before it retracts at end of test
+            fig_name = csv_name.replace("-data.csv", "-livePlottedFigure.png")
+            fig_path = "data/Figures/{:}/".format(date.strftime("%Y-%m-%d")) + fig_name
+            plt.show()
+            plt.draw()
+            fig.savefig(fig_path, transparent=True)
+
             actuator.go_home_quiet_down()
             return
 
