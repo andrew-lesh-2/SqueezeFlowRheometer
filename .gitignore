@@ -11,3 +11,4 @@ LoadCell/config.json
 *.tif
 *.nd2
 *.avi
+*.csv
