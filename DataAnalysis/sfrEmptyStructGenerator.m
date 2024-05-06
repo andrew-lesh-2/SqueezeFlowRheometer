@@ -21,6 +21,7 @@ function sfrStruct = sfrEmptyStructGenerator()
     sfrStruct.F_tar = [];
     sfrStruct.h = [];
     sfrStruct.V = [];
+    sfrStruct.v = [];
 
     % Compute useful values based on data
     sfrStruct.R = [];
