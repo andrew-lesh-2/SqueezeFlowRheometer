@@ -30,6 +30,10 @@ class OpenScale:
                 self.tare_value = self.config["tare"]
                 self.calibration = self.config["calibration"]
                 self.units = self.config["units"]
+                self.outlier_threshold = self.config["max_force"]
+                self.force_limit = (
+                    self.config["max_force"] * self.config["limit_fraction"]
+                )
         except:
             self.config = {}
 
