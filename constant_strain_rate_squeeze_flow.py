@@ -268,6 +268,14 @@ def actuator_thread():
         if time() - start_time >= test_duration or (1000 * gap_m) <= min_gap:
             print("Test complete, stopping.")
             test_active = False
+
+            # Save fig out before it retracts at end of test
+            fig_name = csv_name.replace("-data.csv", "-livePlottedFigure.png")
+            fig_path = "data/Figures/{:}/".format(date.strftime("%Y-%m-%d")) + fig_name
+            plt.show()
+            plt.draw()
+            fig.savefig(fig_path, transparent=True)
+
             actuator.go_home_quiet_down()
             return
 
