@@ -1,4 +1,4 @@
-function sfrStruct = sfrStructGenerator(filePath)
+function sfrStruct = sfrStructGenerator(filePath,xq,yq)
 %SFRTRUCTGENERATOR Gets useful values from SFR data files
 %   Takes in Squeeze Flow Rheometer data and generates a struct with
 %   information about the test.
@@ -40,6 +40,11 @@ function sfrStruct = sfrStructGenerator(filePath)
         sfrStruct.V = sfrDataTable.SampleVolume_m_3_;
     end
     sfrStruct.v = sfrDataTable.CurrentVelocity_mm_s_;
+
+    %%% Interpolate rigidity data
+    if nargin >= 3
+        sfrStruct.h = sfrStruct.h - 0.6*interp1(yq,xq,sfrStruct.F,"linear","extrap");
+    end
 
     % Compute useful values based on data
     if isfield(sfrStruct,'V') % if it's a test with a sample volume
