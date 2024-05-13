@@ -10,6 +10,7 @@ function sfrStruct = sfrEmptyStructGenerator()
 %      stepEndIndices     : matrix of indices at which each step starts and ends
 %      h                  : gap between the two parallel plates, m
 %      V                  : operating volume of sample under the plate, m^3
+%      v                  : velocity of top plate, positive upward, m/s
 %      R                  : radius of the sample, assuming perfectly cylindrical, m
 %      aspectRatio        : h/R, unitless
 %      ScottYieldStress   : yield stress computed according to the Scott (1935) model, Pa

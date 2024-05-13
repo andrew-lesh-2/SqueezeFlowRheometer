@@ -13,6 +13,7 @@ function sfrStruct = sfrStructGenerator(filePath)
 %      stepEndIndices     : matrix of indices at which each step starts and ends
 %      h                  : gap between the two parallel plates, m
 %      V                  : operating volume of sample under the plate, m^3
+%      v                  : velocity of top plate, positive upward, m/s
 %      R                  : radius of the sample, assuming perfectly cylindrical, m
 %      aspectRatio        : h/R, unitless
 %      ScottYieldStress   : yield stress computed according to the Scott (1935) model, Pa
@@ -38,6 +39,7 @@ function sfrStruct = sfrStructGenerator(filePath)
     elseif strmatch("SampleVolume_m_3_",sfrDataTable.Properties.VariableNames) % if it's a test with a sample volume
         sfrStruct.V = sfrDataTable.SampleVolume_m_3_;
     end
+    sfrStruct.v = sfrDataTable.CurrentVelocity_mm_s_;
 
     % Compute useful values based on data
     sfrStruct.R = sqrt(sfrStruct.V(1)./(sfrStruct.h * pi));
