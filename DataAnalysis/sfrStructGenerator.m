@@ -42,10 +42,12 @@ function sfrStruct = sfrStructGenerator(filePath)
     sfrStruct.v = sfrDataTable.CurrentVelocity_mm_s_;
 
     % Compute useful values based on data
-    sfrStruct.R = sqrt(sfrStruct.V(1)./(sfrStruct.h * pi));
-    sfrStruct.aspectRatio = sfrStruct.h ./ sfrStruct.R;
-    sfrStruct.ScottYieldStress = 1.5*sqrt(pi) * (sfrStruct.F .* sfrStruct.h.^(2.5) ./ (sfrStruct.V.^(1.5)));
-    sfrStruct.MeetenYieldStress = (sfrStruct.F .* sfrStruct.h ./ sfrStruct.V(1)) / sqrt(3);
+    if isfield(sfrStruct,'V') % if it's a test with a sample volume
+        sfrStruct.R = sqrt(sfrStruct.V(1)./(sfrStruct.h * pi));
+        sfrStruct.aspectRatio = sfrStruct.h ./ sfrStruct.R;
+        sfrStruct.ScottYieldStress = 1.5*sqrt(pi) * (sfrStruct.F .* sfrStruct.h.^(2.5) ./ (sfrStruct.V.^(1.5)));
+        sfrStruct.MeetenYieldStress = (sfrStruct.F .* sfrStruct.h ./ sfrStruct.V(1)) / sqrt(3);
+    end
     
     % Get unique target forces and identify when each step starts and stops
     sfrStruct.F_tars = unique(sfrStruct.F_tar);
