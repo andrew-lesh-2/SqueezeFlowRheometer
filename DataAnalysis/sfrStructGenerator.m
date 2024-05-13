@@ -50,11 +50,13 @@ function sfrStruct = sfrStructGenerator(filePath)
     end
     
     % Get unique target forces and identify when each step starts and stops
-    sfrStruct.F_tars = unique(sfrStruct.F_tar);
-    sfrStruct.StepEndIndices = zeros(length(sfrStruct.F_tars),2);
-    for i = 1:length(sfrStruct.F_tars)
-        sfrStruct.StepEndIndices(i,1) = find(sfrStruct.F_tar == sfrStruct.F_tars(i),1,"first");
-        sfrStruct.StepEndIndices(i,2) = find(sfrStruct.F_tar == sfrStruct.F_tars(i),1,"last");
+    if isfield(sfrStruct,'F_tar') % if there's distinct targets at all
+        sfrStruct.F_tars = unique(sfrStruct.F_tar);
+        sfrStruct.StepEndIndices = zeros(length(sfrStruct.F_tars),2);
+        for i = 1:length(sfrStruct.F_tars)
+            sfrStruct.StepEndIndices(i,1) = find(sfrStruct.F_tar == sfrStruct.F_tars(i),1,"first");
+            sfrStruct.StepEndIndices(i,2) = find(sfrStruct.F_tar == sfrStruct.F_tars(i),1,"last");
+        end
     end
 
 
