@@ -33,7 +33,11 @@ function sfrStruct = sfrStructGenerator(filePath)
         sfrStruct.F_tar = gramsToN(sfrDataTable.TargetForce_g_);
     end
     sfrStruct.h = sfrDataTable.CurrentGap_m_;
-    sfrStruct.V = sfrDataTable.ViscosityVolume_m_3_;
+    if strmatch("ViscosityVolume_m_3_",sfrDataTable.Properties.VariableNames) % if it's a test with a sample volume
+        sfrStruct.V = sfrDataTable.ViscosityVolume_m_3_;
+    elseif strmatch("SampleVolume_m_3_",sfrDataTable.Properties.VariableNames) % if it's a test with a sample volume
+        sfrStruct.V = sfrDataTable.SampleVolume_m_3_;
+    end
 
     % Compute useful values based on data
     sfrStruct.R = sqrt(sfrStruct.V(1)./(sfrStruct.h * pi));
