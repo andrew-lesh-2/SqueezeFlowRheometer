@@ -29,7 +29,9 @@ function sfrStruct = sfrStructGenerator(filePath)
     % Get data straight from the file
     sfrStruct.t = sfrDataTable.ElapsedTime;
     sfrStruct.F = gramsToN(sfrDataTable.CurrentForce_g_);
-    sfrStruct.F_tar = gramsToN(sfrDataTable.TargetForce_g_);
+    if strmatch("TargetForce_g_",sfrDataTable.Properties.VariableNames) % if targets exist
+        sfrStruct.F_tar = gramsToN(sfrDataTable.TargetForce_g_);
+    end
     sfrStruct.h = sfrDataTable.CurrentGap_m_;
     sfrStruct.V = sfrDataTable.ViscosityVolume_m_3_;
 
