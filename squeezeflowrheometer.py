@@ -1,5 +1,7 @@
 import re
 import math
+from pathlib import Path
+from datetime import datetime
 
 
 class SqueezeFlowRheometer:
@@ -97,8 +99,11 @@ class SqueezeFlowRheometer:
         print("Sample volume is {:.2f}mL".format(sample_vol * 1e6))
         return sample_vol
 
-    def input_step_duration(default_duration) -> float:
+    def input_step_duration(default_duration: float = 300) -> float:
         """Gets duration of each step in seconds from user
+
+        Args:
+            default_duration (float, optional): default step duration in seconds. Defaults to 300
 
         Returns:
             float: duration of each step in seconds
@@ -160,3 +165,46 @@ class SqueezeFlowRheometer:
             target_speed = abs(SqueezeFlowRheometer.find_num_in_str(target_speed_line))
         print("Retraction speed is {:.1f}mm/s".format(target_speed))
         return target_speed
+
+    def create_data_file(file_name: str, file_heading: str):
+        """Create a .csv data file for an SFR test
+
+        Args:
+            file_name (str): file name with the .csv extension
+            file_heading (str): first row of .csv file, a comma separated string of headers
+        """
+        with open("data/" + file_name, "a") as datafile:
+            datafile.write(file_heading)
+
+    def create_figures_folder(date: datetime) -> str:
+        folder_path = "data/Figures/{:}".format(date.strftime("%Y-%m-%d"))
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+        return folder_path
+
+    def get_day_date_str(date: datetime) -> str:
+        """Gets a formatted date string down to the day
+
+        Args:
+            date (datetime): a datetime object storing the time for the test to
+
+        Returns:
+            str: yyyy-mm-dd formatted date string
+        """
+        return date.strftime("%Y-%m-%d")
+
+    def get_second_date_str(date: datetime) -> str:
+        """Gets a formatted date string down to the second. Hours are in 24-hour time
+
+        Args:
+            date (datetime): a datetime object storing the time for the test to
+
+        Returns:
+            str: yyyy-mm-dd_HH-MM-SS formatted date string
+        """
+        return date.strftime("%Y-%m-%d_%H-%M-%S")
+
+    def write_data_to_file(file_name: str, output_params: list) -> str:
+        with open("data/" + file_name, "a") as datafile:
+            dataline = ",".join(map(str, output_params)) + "\n"
+            datafile.write(dataline)
+            return dataline
