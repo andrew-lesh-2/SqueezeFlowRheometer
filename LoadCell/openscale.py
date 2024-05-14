@@ -1,4 +1,5 @@
 import serial
+import serial.tools.list_ports
 from time import time
 import json
 import re
@@ -14,7 +15,7 @@ class OpenScale:
     """The maximum acceptable jump in grams between two force readings"""
 
     def __init__(self):
-        self.ser = serial.Serial("COM5", 115200)
+        self.ser = serial.Serial(self.get_COM_port(), 115200)
         self.config_path = "LoadCell\config.json"
         self.outlier_threshold = (
             100  # g, if a measurement is beyond this limit, throw it out
@@ -399,3 +400,16 @@ class OpenScale:
             )
             if ans == "y":
                 self.tare()
+
+    def get_COM_port(self):
+        """Finds COM ports connected to USB
+
+        Returns:
+            _type_: _description_
+        """
+        com_ports = serial.tools.list_ports.comports()
+        usable_port = ""
+        for port in com_ports:
+            if port.vid:  # if
+                usable_port = port.device
+        return usable_port
