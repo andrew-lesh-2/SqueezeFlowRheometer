@@ -16,10 +16,6 @@ date_str = date.strftime("%Y-%m-%d_%H-%M-%S")
 """timestamp string for experiment start time in yyyy-mm-dd_HH:MM:SS format"""
 csv_name = date_str + "_" + "PID_squeeze_flow_1" + "-data.csv"
 
-HAMMER_RADIUS = 25e-3  # m
-HAMMER_AREA = math.pi * HAMMER_RADIUS**2  # m^2
-
-
 
 force = 0
 """Current force reading. Negative is a force pushing up on the load cell"""

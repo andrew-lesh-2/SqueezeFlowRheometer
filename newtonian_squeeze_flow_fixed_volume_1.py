@@ -13,10 +13,6 @@ date_str = date.strftime("%Y-%m-%d_%H-%M-%S")
 """timestamp string for experiment start time in yyyy-mm-dd_HH:MM:SS format"""
 csv_name = date_str + "_" + "newtonain_squeeze_flow_fixed_volume_1" + "-data.csv"
 
-HAMMER_RADIUS = 25e-3  # m
-HAMMER_AREA = math.pi * HAMMER_RADIUS**2  # m^2
-
-
 
 force = 0
 """Current force reading. Positive is a force pushing up on the load cell"""
