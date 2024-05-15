@@ -15,7 +15,7 @@ import numpy as np
 # - Initialization -------------------------------------------
 
 date = datetime.now()
-date_str = date.strftime("%Y-%m-%d_%H-%M-%S")
+date_str = sfr.get_second_date_str(date)
 """timestamp string for experiment start time in yyyy-mm-dd_HH:MM:SS format"""
 csv_name = date_str + "_" + "rigidity_test" + "-data.csv"
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     actuator.heartbeat()
 
     # Make sure the data folder as well as the figures folder exists before trying to save anything there
-    Path("data/Figures/{:}".format(date.strftime("%Y-%m-%d"))).mkdir(
+    Path("data/Figures/{:}".format(sfr.get_day_date_str(date))).mkdir(
         parents=True, exist_ok=True
     )
 
@@ -138,7 +138,7 @@ def actuator_thread():
 
     # Save fig out before it retracts at end of test
     fig_name = csv_name.replace("-data.csv", "-livePlottedFigure.png")
-    fig_path = "data/Figures/{:}/".format(date.strftime("%Y-%m-%d")) + fig_name
+    fig_path = "data/Figures/{:}/".format(sfr.get_day_date_str(date)) + fig_name
     plt.show()
     plt.draw()
     fig.savefig(fig_path, transparent=True)
