@@ -16,15 +16,18 @@ class OpenScale:
 
     def __init__(self):
         self.ser = serial.Serial(self.get_COM_port(), 115200)
-        self.config_path = "LoadCell\config.json"
+
         self.outlier_threshold = (
             100  # g, if a measurement is beyond this limit, throw it out
         )
-
         self.old_readings = [None] * (
             OpenScale.OLD_READING_KEEP_AMOUNT + 1
         )  # also have to store current value
 
+        self.config_path = "LoadCell\config.json"
+        self.load_config()
+
+    def load_config(self) -> dict:
         try:
             with open(self.config_path, "r") as read_file:
                 self.config = json.load(read_file)
@@ -37,6 +40,7 @@ class OpenScale:
                 )
         except:
             self.config = {}
+        return self.config
 
     def flush_old_lines(self):
         """Clears existing serial buffer"""
