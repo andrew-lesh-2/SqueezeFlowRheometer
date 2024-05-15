@@ -45,7 +45,7 @@ s = sfrEmptyStructGenerator();
 sfrStructs = repmat(s,length(sfrFiles),1);
 for i = 1:length(sfrFiles)
     filePath = sfrDataFolder + sfrFiles(i);
-    sfrStructs(i) = sfrStructGenerator(filePath);
+    sfrStructs(i) = sfrStructGenerator(filePath,xq,yq);
     % sfrFiles(i)
     % sfrStructs(i)
 end
@@ -453,7 +453,7 @@ for i = 1:length(sfrFiles)
     y = s.MeetenYieldStress(s.StepEndIndices(:,2));
     y = y / max(y);
 
-    semilogx(x,y,...
+    plot(x,y,...
         markerStr,'DisplayName',DisplayName,'MarkerEdgeColor',plotColor,...
         'MarkerFaceColor',fillColor);
 
