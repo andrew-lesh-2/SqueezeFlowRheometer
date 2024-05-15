@@ -24,7 +24,7 @@ function sfrStruct = sfrStructGenerator(filePath,xq,yq)
 
     % Discard pre- and post- test data
     %   (before it reaches the sample and after the last step is done)
-    activeIndices = strcmp(sfrDataTable.TestActive_,'True');
+    activeIndices = strcmpi(sfrDataTable.TestActive_,'true');
     sfrDataTable = sfrDataTable(activeIndices,:);
     
     % Get data straight from the file
@@ -64,24 +64,25 @@ function sfrStruct = sfrStructGenerator(filePath,xq,yq)
         end
     end
 
-
     % Get test date, test number, and sample volume as strings
-    fileName = extractAfter(filePath, "\");
+    level = wildcardPattern + "\";
+    pat = asManyOfPattern(level);
+    fileName = extractAfter(filePath, pat);
 
-    temp = split(fileName,"PID_squeeze_flow_1_Test");
-    dateStr = extractAfter(extractBefore(temp(1),"_"),"-"); % get just month and day
-    temp = replace(temp(2), "-","_");
-    temp = split(temp(1), "_");
-    testNum = temp(1);
-    sampleSubstance = lower(temp(2));
-    testNum = extractBefore(testNum(1),2);
-    % volStr = num2str(sfrStruct.V(1)*10^6,3) + "mL";
-    volStr = num2str(sfrStruct.V(1)*10^6,"%.2f") + "mL";
-
-    sfrStruct.dateStr = dateStr;
-    sfrStruct.testNum = testNum;
-    sfrStruct.sampleSubstance = sampleSubstance;
-    sfrStruct.volStr = volStr;
+    temp = split(fileName,"Test");
+    if length(temp) > 1 % if filename conforms to expected format, get info out of it
+        dateStr = extractAfter(extractBefore(temp(1),"_"),"-"); % get just month and day
+        temp = replace(temp(2), "-","_");
+        temp = split(temp(1), "_");
+        testNum = regexp(temp(1),'\d*','Match');
+        sampleSubstance = lower(temp(2));
+        volStr = num2str(sfrStruct.V(1)*10^6,"%.2f") + "mL";
+    
+        sfrStruct.dateStr = dateStr;
+        sfrStruct.testNum = testNum;
+        sfrStruct.sampleSubstance = sampleSubstance;
+        sfrStruct.volStr = volStr;
+    end
 end
 
 function F = gramsToN(f)
