@@ -279,11 +279,7 @@ class OpenScale:
         Returns:
             float: _description_
         """
-        if (
-            ("tare" not in self.config)
-            or ("calibration" not in self.config)
-            or ("units" not in self.config)
-        ):
+        if "tare" not in self.config:
             print("Load cell has not been tared, will now perform taring.")
             tare_first = True
         if tare_first:
@@ -307,8 +303,16 @@ class OpenScale:
         temp = re.compile("([0-9.]+)([a-zA-Z]+)")
         res = temp.match(cal_weight_str).groups()
         cal_weight = abs(float(res[0]))
-        units = res[1]
-        self.config["units"] = units
+        self.units = res[1]
+        self.config["units"] = self.units
+
+        # Also set max force limit while you're at it
+        max_force_str = input(
+            "Enter the load cell capacity in {:}: ".format(self.units)
+        )
+        self.outlier_threshold = abs(float(max_force_str))
+        self.config["max_force"] = self.outlier_threshold
+        self.force_limit = self.outlier_threshold * self.config["limit_fraction"]
 
         for i in range(10):  # ignore the first few lines, they're not data
             self.get_line()
@@ -389,7 +393,7 @@ class OpenScale:
             weight = -self.wait_for_calibrated_measurement()
             if weight is None:  # if startup garbage not gone yet
                 continue
-            print("{:6.2f}{:}".format(weight, units))
+            print("{:6.2f}{:}".format(weight, self.units))
 
         return calibration
 
