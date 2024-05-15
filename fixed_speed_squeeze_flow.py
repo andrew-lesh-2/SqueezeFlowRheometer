@@ -17,18 +17,6 @@ HAMMER_RADIUS = 25e-3  # m
 HAMMER_AREA = math.pi * HAMMER_RADIUS**2  # m^2
 
 
-def grams_to_N(f: float) -> float:
-    """Takes in force in grams and converts to Newtons
-
-    Args:
-            f (float): force in grams
-
-    Returns:
-            float: force in Newtons
-    """
-    return 0.00980665 * f
-
-
 def compute_gap() -> float:
     """Computes the gap in m
 
