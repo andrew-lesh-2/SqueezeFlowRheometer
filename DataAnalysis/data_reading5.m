@@ -39,12 +39,22 @@ sfrFiles = ["2023-07-13_11-38-52_PID_squeeze_flow_1_Test1a-Carbopol_1mL_5g-data.
     "2023-08-02_14-19-49_PID_squeeze_flow_1_Test2b-CarbopolB_3mL_5g-data.csv";
     "2023-08-02_15-26-10_PID_squeeze_flow_1_Test3a-CarbopolB_4mL_5g-data.csv";
     "2023-08-02_16-28-59_PID_squeeze_flow_1_Test4a-CarbopolB_5mL_5g-data.csv";
+    "2023-08-04_13-56-50_set_gap_squeeze_flow_Test1c-CarbopolC1_1mL_10g-data.csv";
+    "2023-08-04_14-19-02_set_gap_squeeze_flow_Test2a-CarbopolC1_1mL_10g-data.csv";
+    "2023-08-04_14-37-02_set_gap_squeeze_flow_Test3a-CarbopolC1_1mL_10g-data.csv";
+    "2023-08-07_12-54-25_set_gap_squeeze_flow_Test5a-CarbopolC1_2mL_12g-data.csv";
+    % "2023-08-07_16-02-30_set_gap_squeeze_flow_Test6a-CarbopolA_1mL_11g-data.csv";
+    "2023-08-07_16-26-50_set_gap_squeeze_flow_Test7a-CarbopolA_1mL_11g-data.csv";
+    "2023-08-07_16-55-47_set_gap_squeeze_flow_Test8a-CarbopolA_1mL_10g-data.csv";
+    "2023-08-14_11-48-43_PID_squeeze_flow_1_Test1a-CarbopolA_0mL_5g-data.csv";
+    "2023-08-14_12-32-48_PID_squeeze_flow_1_Test2a-CarbopolA_0mL_5g-data.csv";
     ];
 
 s = sfrEmptyStructGenerator();
 sfrStructs = repmat(s,length(sfrFiles),1);
 for i = 1:length(sfrFiles)
     filePath = sfrDataFolder + sfrFiles(i);
+    % sfrStructs(i) = sfrStructGenerator(filePath,xq,yq);
     sfrStructs(i) = sfrStructGenerator(filePath);
     % sfrFiles(i)
     % sfrStructs(i)
@@ -146,12 +156,12 @@ date_strs = unique(date_strs);
 % sample_strs = unique(sample_strs);
 % nice_sample_strs = ["Carbopol", "Carbopol A", "Carbopol B"];
 
-sample_strs = ["carbopola", "carbopolb", "carbopol"];
-nice_sample_strs = ["1.46wt% Carbopol, 0.12wt% NaOH", "1.46wt% Carbopol, 0.18wt% NaOH", "1.46wt% Carbopol, 0.29wt% NaOH"];
+sample_strs = ["carbopola", "carbopolb", "carbopol", "carbopolc1"];
+nice_sample_strs = ["1.46wt% Carbopol, 0.12wt% NaOH", "1.46wt% Carbopol, 0.18wt% NaOH", "1.46wt% Carbopol, 0.29wt% NaOH", "1.46wt% Carbopol, 0.29wt% NaOH"];
 
 %% Plot Data
 colors = ["#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F"];
-markers = ['o','s','d','^','p','h','<','>'];
+markers = ['o','s','d','^','p','h','<','>','v','*','+'];
 
 colorList = parula();
 
@@ -217,6 +227,9 @@ for i = 1:length(sfrFiles)
     markerIdx = find(strcmp(date_strs,s.dateStr));
     markerStr = markers(markerIdx);
 
+    plotColor = 'k';
+    fillColor = 'k';
+
     plot(s.aspectRatio(s.StepEndIndices(:,2)),...
         s.MeetenYieldStress(s.StepEndIndices(:,2)),markerStr,...
         'DisplayName',DisplayName,'MarkerEdgeColor',plotColor,...
@@ -241,17 +254,28 @@ figure(3)
 t = tiledlayout("horizontal","TileSpacing","tight");
 axs = gobjects(length(sample_strs),1);
 for i = 1:length(sample_strs)
+    if(contains(sample_strs(i),'carbopolc',IgnoreCase=true))
+        continue
+    end
     axs(i) = nexttile;
     plotted_counter = 1;
     for j = 1:length(sfrStructs)
         if ~strcmpi(sfrStructs(j).sampleSubstance,sample_strs(i))
-            continue
+            if ~(strcmpi(sample_strs(i),'carbopol') && contains(sfrStructs(j).sampleSubstance,'carbopolc',IgnoreCase=true))
+                continue
+            end
         end
         s = sfrStructs(j);
 
         DisplayName = s.dateStr + " " + s.testNum + " " + s.volStr;
     
         plotColor = colors(mod(plotted_counter - 1, length(colors)) + 1);
+        if strcmpi(sample_strs(i),'carbopol')
+            plotColor = colors(1);
+            if contains(sfrStructs(j).sampleSubstance,'carbopolc',IgnoreCase=true)
+                plotColor = colors(2);
+            end
+        end
         fillColor = plotColor;
     
         markerIdx = find(strcmp(date_strs,s.dateStr));
@@ -284,11 +308,109 @@ for i = 1:length(sample_strs)
 end
 linkaxes(axs,'xy')
 xlim([0,1])
+% ylim([0,250])
 title(t,'Perfect Slip, Meeten (2000)')
 ylabel(t,'Yield Stress [Pa]')
 sfrPrettyPlot(false)
 end
 
+%% Sherwood and Durban
+
+% Sherwood and Durban propose F = (pi * D^3 * m * tau_0)/(12*h) +
+% (sqrt(3) * pi *D ^2 * tau_0)/8 * (sqrt(1 - m^2) + 1/m * asin(m))
+
+% Call the far right terms with m f(m) = sqrt(1 - m^2) + 1/m * asin(m)
+f = @(m) sqrt(1 - m^2) + asin(m)/m;
+
+% with force, volume, and height, this can become
+% F = Omega*tau_0/h * [ (m*D)/(3*h) + sqrt(3)/2 * f(m) ]
+
+% Which should give
+% F*h / (Omega*tau_0) = (m/3)*(D/h) + sqrt(3)/2 * f(m)
+% Which is linear in aspect ratio
+% plot F h / Omega vs. R/h
+
+% actually h is on both sides
+
+
+% plot data, changing symbol by day and color by test
+if true
+figure(1)
+for i = 1:length(sfrFiles)
+    s = sfrStructs(i);
+    DisplayName = s.dateStr + " " + s.testNum + " " + s.volStr;
+
+    plotColor = colors(mod(i - 1, length(colors)) + 1);
+    fillColor = plotColor;
+    % if i > 7 % make symbols hollow after some point
+    %     fillColor = 'auto';
+    % end
+
+    markerIdx = find(strcmp(date_strs,s.dateStr));
+    markerStr = markers(markerIdx);
+
+    y = (s.F .* s.h) ./ (s.V);
+
+    plot(s.aspectRatio(s.StepEndIndices(:,2)),...
+        y(s.StepEndIndices(:,2)),markerStr,...
+        'DisplayName',DisplayName,'MarkerEdgeColor',plotColor,...
+        'MarkerFaceColor',fillColor);
+
+    % plot(s.aspectRatio(s.StepEndIndices(:,2)),...
+    %     s.MeetenYieldStress(s.StepEndIndices(:,2)),markerStr,...
+    %     'DisplayName',DisplayName,'MarkerEdgeColor',plotColor,...
+    %     'MarkerFaceColor',fillColor);
+
+    hold on
+end
+hold off
+xlabel('h/R [-]')
+ylabel('Yield Stress [Pa]')
+
+% Add legend for the first/main plot handle
+hLegend = legend('location','northeast');
+hLegend.NumColumns = 2;
+title("Perfect Slip, Meeten (2000)")
+end
+sfrPrettyPlot(false)
+
+
+
+% append all carbopol B results
+if true
+
+i = 2;
+
+carbopol_B_structs = {};
+
+for j = 1:length(sfrStructs)
+    if ~strcmpi(sfrStructs(j).sampleSubstance,sample_strs(i))
+        if ~(strcmpi(sample_strs(i),'carbopol') && contains(sfrStructs(j).sampleSubstance,'carbopolc',IgnoreCase=true))
+            continue
+        end
+    end
+    s = sfrStructs(j);
+    carbopol_B_structs{end + 1} = s;
+end
+
+y = [];
+x = [];
+for i = 1:length(carbopol_B_structs)
+    s = carbopol_B_structs{i};
+    
+    y_ = s.F .* s.h ./ s.V;
+    x_ = s.R ./ s.h;
+
+    indices = s.StepEndIndices(:,2);
+
+    y_ = y_(indices);
+    x_ = x_(indices);
+
+    y = [y; y_];
+    x = [x; x_];
+end
+
+end
 
 %% Do linear fit for each sample
 
@@ -331,11 +453,12 @@ for i = 1:length(sample_strs)
         plotted_counter = plotted_counter + 1;
     end
 
-    X = [ones(length(yieldStress),1), h_R];
+    X = [ones(length(h_R),1), h_R];
     y = yieldStress;
     b = X \ y;
     % yieldStressIntercept = b(1);
     % abs(b(1) / b(2))
+    fitdist(yieldStress(h_R < 0.1),'Normal')
 
     xl = xlim;
     % yl = ylim;
@@ -369,68 +492,26 @@ sfrPrettyPlot(false)
 end
 
 
-%% Do linear fit of Meeten Stress vs. h/R
+%% Plot strain rates for everything
 
-h_R = [];
-yieldStress = [];
-
-for i = 1:length(sfrFiles)
-    h_R = [h_R; sfrStructs(i).aspectRatio(sfrStructs(i).StepEndIndices(:,2))];
-    yieldStress = [yieldStress; sfrStructs(i).MeetenYieldStress(sfrStructs(i).StepEndIndices(:,2))];
-end
-
-X = [ones(length(yieldStress),1), h_R];
-y = yieldStress;
-
-b = X \ y;
-
-yieldStressIntercept = b(1);
-
+if true
 figure(4)
-% plot sfr data
-for i = 1:length(sfrFiles)
-    testNum = split(sfrFiles(i),"PID_squeeze_flow_1_Test");
-    dateStr = extractAfter(extractBefore(testNum(1),"_"),"-"); % get just month and day
-    testNum = split(testNum(2), "-");
-    testNum = split(testNum(1), "_");
-    testNum = testNum(1);
-    volStr = num2str(sfrStructs(i).V(1)*10^6,3);
-    DisplayName = dateStr + " " + testNum + " " + volStr + "mL";
-
-    plotColor = colors(mod(i - 1, length(colors)) + 1);
-    fillColor = plotColor;
-    % if i > 7 % make symbols hollow after some point
-    %     fillColor = 'auto';
-    % end
-
-    markerIdx = find(strcmp(date_strs,dateStr));
-    markerStr = markers(markerIdx);
-
-    plot(sfrStructs(i).aspectRatio(sfrStructs(i).StepEndIndices(:,2)),...
-        sfrStructs(i).MeetenYieldStress(sfrStructs(i).StepEndIndices(:,2)),markerStr,...
-        'DisplayName',DisplayName,'MarkerEdgeColor',plotColor,...
-        'MarkerFaceColor',fillColor);
-
+for i = 1:length(sfrStructs)
+    s = sfrStructs(i);
+    % x = s.h;
+    % y = abs(s.v ./ s.h);
+    % y = abs(s.v);
+    x = abs(s.v ./ s.h);
+    y = s.F;
+    semilogx(x,y)
     hold on
 end
-xlabel('h/R [-]')
-ylabel('Yield Stress [Pa]')
-xl = xlim;
-yl = ylim;
-xq = linspace(min(xl), max(xl));
-trendlineStr = "y = " + num2str(b(2),'%.1f') + "x + " + num2str(b(1),'%.1f');
-plot(xq, xq*b(2) + b(1), 'k-', 'DisplayName', trendlineStr)
 hold off
-
-% Add legend for the first/main plot handle
-hLegend = legend('location','northeast');
-hLegend.NumColumns = 2;
-title("Perfect Slip, Meeten (2000)")
-
-meanYieldStress = mean(yieldStress);
-SST = sum((yieldStress - meanYieldStress).^2);
-SSR = sum((yieldStress - (h_R*b(2) + b(1))).^2);
-R_squared = 1 - SSR / SST
+xlabel('Effective Extensional Strain Rate v/s [s^{-1}]')
+ylabel('Force [N]')
+sfrPrettyPlot
+xlim([1e-2,1])
+end
 
 %% Look at variance of force signal versus gap
 
