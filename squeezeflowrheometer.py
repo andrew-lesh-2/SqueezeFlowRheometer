@@ -5,6 +5,8 @@ from datetime import datetime
 
 
 class SqueezeFlowRheometer:
+    HAMMER_RADIUS = 25e-3
+    HAMMER_AREA = math.pi * HAMMER_RADIUS**2
     def input_targets(scale_unit: str, settings: dict) -> list[float]:
         """Takes in a list of strictly increasing force targets from the user
 
