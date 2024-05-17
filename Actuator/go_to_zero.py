@@ -1,22 +1,13 @@
-import threading
 import pytic
-
-# import time
-from time import sleep, time
-import math
-from datetime import datetime
-
-# - Initialization -------------------------------------------
+from time import sleep
 
 
-date = datetime.now()
-date_str = date.strftime("%Y-%m-%d_%H-%M-%S")
-"""timestamp string for experiment start time in yyyy-mm-dd_HH:MM:SS format"""
-csv_name = date_str + "_" + "actuator_test_3" + "-data.csv"
-# csv_name =  "actuator_test_1" + '-data.csv'
-# csv_name = 'test_file.csv'
-# print(csv_name)
-"""csv file name - includes timestamp (yyyy-mm-dd_HH:MM:SS), material, dish, dutycycle, on/off time, and omega_shear in that order"""
+def move_to_pos(pos):
+    tic.set_target_position(pos)
+    while tic.variables.current_position != tic.variables.target_position:
+        sleep(0.1)
+        tic.reset_command_timeout()
+
 
 if __name__ == "__main__":
     tic = pytic.PyTic()
@@ -29,18 +20,6 @@ if __name__ == "__main__":
 
     tic.set_max_decel(500000)
     tic.set_max_accel(500000)
-
-
-def move_to_pos(pos):
-    tic.set_target_position(pos)
-    while tic.variables.current_position != tic.variables.target_position:
-        sleep(0.1)
-        tic.reset_command_timeout()
-
-
-def foreground():
-    """drives actuator"""
-    # global tic
 
     # Load configuration file and apply settings
     # tic.settings.load_config('actuator_test_1_config.yml')
@@ -69,8 +48,3 @@ def foreground():
     print(tic.variables.error_status)
 
     print("=" * 20 + " FOREGROUND IS DONE " + "=" * 20)
-
-
-f = threading.Thread(name="foreground", target=foreground)
-
-f.start()
