@@ -25,6 +25,18 @@ class OpenScale:
         )  # also have to store current value
 
         self.config_path = "LoadCell\config.json"
+        """Location of load cell config file"""
+        self.config: dict
+        """Dict of configuration and calibration data for load cell"""
+        self.tare_value: float
+        """Tare constant for the load cell"""
+        self.calibration: float
+        """Calibration constant for the load cell"""
+        self.units: str
+        """Units the load cell is calibrated to report force in"""
+        self.outlier_threshold: float
+        self.force_limit: float
+        """Max allowable force before the rheometer automatically ends the test."""
         self.load_config()
 
     def load_config(self) -> dict:

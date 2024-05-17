@@ -1,80 +1,24 @@
 import threading
 from time import sleep, time
-import json
-import math
-from datetime import datetime
-import re
-from LoadCell.openscale import OpenScale
-from Actuator.ticactuator import TicActuator
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from pathlib import Path
-from squeezeflowrheometer import SqueezeFlowRheometer as sfr
+from squeezeflowrheometer import SqueezeFlowRheometer
 import numpy as np
 
-# - Initialization -------------------------------------------
-
-date = datetime.now()
-date_str = sfr.get_second_date_str(date)
-"""timestamp string for experiment start time in yyyy-mm-dd_HH:MM:SS format"""
-csv_name = date_str + "_" + "set_gap_squeeze_flow_multistep" + "-data.csv"
-
-HAMMER_RADIUS = 25e-3  # m
-HAMMER_AREA = math.pi * HAMMER_RADIUS**2  # m^2
-
-
-force = 0
-"""Current force reading. Negative is a force pushing up on the load cell"""
-target = 0
-"""Target force. Negative is a force pushing up on the load cell"""
-targets = []
-"""Monotonically increasing list of target forces. Will run a test on each force, one after the other."""
-step_id = 0
-"""Which target step the test is currently on. 0 is the first step"""
-FORCE_UP_SIGN = 1
-"""Sign of a positive force. This should be 1 or -1, and is used to compute velocity based on force"""
-start_gap = 0
-"""Initial distance (mm) away from hard stop."""
-gap = 0
-"""Current gap (m) between hammer and hard stop"""
-sample_volume = 0
-"""Amount of sample (m^3)"""
-visc_volume = 0
-"""Volume used for viscosity computations. Will be less than total sample if spread beyond hammer."""
-eta_guess = 0
-"""Estimate of newtonian viscosity of sample (Pa.s)"""
-yield_stress_guess = 0
-"""Estimate of yield stress of sample (Pa)"""
-test_active = False
-"""Whether or not the test is active. Should be true after force threshold is met but before test ends"""
-spread_beyond_hammer = False
-"""Whether or not the sample has spread beyond the hammer. This will happen if gap gets too thin."""
 sample_str = ""
 """What the sample is made of. Used in filename."""
 
-a = 0.7
-b = 0.15
-c = 50
-d = 0.01
-
-times = []
-forces = []
-gaps = []
-yieldStressGuesses = []
+targets: list[float] = []
+"""Set of target gaps"""
 
 fig = plt.figure(figsize=(7.2, 4.8))
 
 if __name__ == "__main__":
-    scale = OpenScale()
-
-    # Input test values from external settings file
-    settings_path = "test_settings.json"
-    with open(settings_path, "r") as read_file:
-        settings = json.load(read_file)
+    sfr = SqueezeFlowRheometer()
 
     # Get test details from user
-    start_gap = sfr.input_start_gap(scale)
-    sample_volume = sfr.input_sample_volume()
+    sfr.start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
+    sfr.sample_volume = SqueezeFlowRheometer.input_sample_volume()
     sample_str = input("What's the sample made of? This will be used for file naming. ")
 
     # # Get test details from settings file & config file
@@ -83,89 +27,61 @@ if __name__ == "__main__":
 
     # first_gap = sample_volume ** (1.0 / 3.0) * 1000  # mm
     first_gap = 3
-    min_gap = sample_volume / HAMMER_AREA * 1000  # mm
+    min_gap = sfr.sample_volume / SqueezeFlowRheometer.HAMMER_AREA * 1000  # mm
     targets = np.geomspace(first_gap, 0.5 * min_gap, 20).tolist()
-    target = targets[0]
+    sfr.target = targets[0]
 
-    scale.check_tare()
+    sfr.check_tare()
 
-    actuator = TicActuator(step_mode=settings["actuator_step_mode"])
-    actuator.set_max_accel_mmss(settings["actuator_max_accel_mmss"], True)
-    # actuator.set_max_speed_mms(settings["actuator_max_speed_mms"])
-    actuator.set_max_speed_mms(5)
+    sfr.set_max_speed_mms(5)
 
     # Zero current motor position
-    actuator.halt_and_set_position(0)
-    actuator.heartbeat()
+    sfr.halt_and_set_position(0)
+    sfr.heartbeat()
 
-    csv_name = (
-        date_str
+    # Set up files/folders
+    output_file_name_base = (
+        sfr.get_day_date_str()
         + "_"
-        + "set_gap_squeeze_flow_{:}_{:d}mL_{:d}{:}".format(
-            sample_str, round(sample_volume * 1e6), round(target), scale.units
+        + "set_gap_squeeze_flow{:}_{:d}mL".format(
+            sample_str, round(sfr.sample_volume * 1e6)
         )
-        + "-data.csv"
     )
-
-    # Make sure the data folder as well as the figures folder exists before trying to save anything there
-    Path("data/Figures/{:}".format(sfr.get_day_date_str(date))).mkdir(
-        parents=True, exist_ok=True
-    )
-
-    with open("data/" + csv_name, "a") as datafile:
-        datafile.write(
-            "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,Max Accel,Step Mode,Voltage In (mV),Current Force ({:}),Target Force ({:}),Start Gap (m),Current Gap (m),Viscosity (Pa.s),Yield Stress (Pa),Sample Volume (m^3),Viscosity Volume (m^3), Test Active?, Spread beyond hammer?, Error, K_P, Integrated Error, K_I, Error Derivative, K_D\n".format(
-                scale.units, scale.units
-            )
+    sfr.data_file_name = output_file_name_base + "-data.csv"
+    sfr.create_figures_folder()
+    sfr.create_data_file(
+        "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,Max Accel,Step Mode,Voltage In (mV),Current Force ({:}),Target Force ({:}),Start Gap (m),Current Gap (m),Viscosity (Pa.s),Yield Stress (Pa),Sample Volume (m^3),Viscosity Volume (m^3), Test Active?, Spread beyond hammer?\n".format(
+            sfr.units, sfr.units
         )
-
-
-def load_cell_thread():
-    """Continuously reads load cell and reports the upward force on the load cell"""
-    global force
-
-    start_time = time()
-
-    for _ in range(10):  # get rid of first few lines that aren't readings
-        scale.get_line()
-    scale.flush_old_lines()  # and get rid of any others that were generated when we were busy setting up
-
-    while True:
-        force = scale.wait_for_calibrated_measurement(True) * FORCE_UP_SIGN
-
-        if (time() - start_time) >= 7200 or (
-            (not ac.is_alive()) and (not bkg.is_alive()) and (time() - start_time) > 1
-        ):
-            print("Stopping load cell reading")
-            break
+    )
 
 
 def actuator_thread():
     """Drives actuator"""
-    global test_active, times, gaps, forces, yieldStressGuesses, target, step_id, fig
+    global sfr, targets, step_id, fig
 
     print("Waiting 2 seconds before starting")
     sleep(2)
 
     # - Motion Command Sequence ----------------------------------
 
-    actuator.startup()
+    sfr.startup()
 
     # Now that test is active, throw away most of the pre-test data.
     data_keep_time = 2  # how many seconds to keep
     data_rate = 10  # roughly how many datapoints I record per second
     keep_datapoints = data_keep_time * data_rate  # how many datapoints to keep
-    if len(times) > keep_datapoints:
+    if len(sfr.times) > keep_datapoints:
         # only throw away points if they're older than data_keep_time
-        times = times[-keep_datapoints:]
-        forces = forces[-keep_datapoints:]
-        gaps = gaps[-keep_datapoints:]
-        yieldStressGuesses = yieldStressGuesses[-keep_datapoints:]
+        sfr.times = sfr.times[-keep_datapoints:]
+        sfr.forces = sfr.forces[-keep_datapoints:]
+        sfr.gaps = sfr.gaps[-keep_datapoints:]
+        sfr.yieldStressGuesses = sfr.yieldStressGuesses[-keep_datapoints:]
 
     step_id = 0
-    target = targets[step_id]
+    sfr.target = targets[step_id]
 
-    test_active = True
+    sfr.test_active = True
 
     step_rest_length = (
         45  # seconds, how long to sit at the current spot before moving on
@@ -174,141 +90,53 @@ def actuator_thread():
     for t in targets:
         print("Target gap is {:.2f}mm".format(t))
 
-        target_pos = t - start_gap
-        target = t
+        target_pos = t - sfr.start_gap
+        sfr.target = t
 
         max_speed = max_strain_rate * t
-        actuator.set_max_speed_mms(max_speed)
+        sfr.set_max_speed_mms(max_speed)
 
-        actuator.heartbeat()
-        actuator.move_to_mm(target_pos)
-        actuator.heartbeat()
+        sfr.heartbeat()
+        sfr.move_to_mm(target_pos)
+        sfr.heartbeat()
         print("Reached position, waiting")
 
         step_rest_start_time = time()
         while time() - step_rest_start_time <= step_rest_length:
             sleep(0.1)
-            actuator.heartbeat()
+            sfr.heartbeat()
 
     print("Last step complete. Test is done.")
-    test_active = False
+    sfr.test_active = False
+    sfr.save_figure(fig)
 
-    # Save fig out before it retracts at end of test
-    fig_name = csv_name.replace("-data.csv", "-livePlottedFigure.png")
-    fig_path = "data/Figures/{:}/".format(sfr.get_day_date_str(date)) + fig_name
-    plt.show()
-    plt.draw()
-    fig.savefig(fig_path, transparent=True)
-
+    # Gradually back off of material since it's probably also stiff to retract from
     for t in reversed(targets):
-        target_pos = t - start_gap
+        target_pos = t - sfr.start_gap
 
         max_speed = max_strain_rate * t
-        actuator.set_max_speed_mms(max_speed)
+        sfr.set_max_speed_mms(max_speed)
 
-        actuator.heartbeat()
-        actuator.move_to_mm(target_pos)
-        actuator.heartbeat()
+        sfr.heartbeat()
+        sfr.move_to_mm(target_pos)
+        sfr.heartbeat()
 
-    actuator.set_max_speed_mms(5)
-    actuator.go_home_quiet_down()
+    sfr.set_max_speed_mms(5)
+    sfr.go_home_quiet_down()
     print("Actuator thread is done.")
 
 
-def background():
-    """Records data to csv"""
-    global actuator, start_gap, test_active, spread_beyond_hammer, visc_volume, yield_stress_guess
+sfr.load_cell_thread = threading.Thread(
+    name="loadcell", target=sfr.load_cell_thread_method
+)
+sfr.actuator_thread = threading.Thread(name="actuator", target=actuator_thread)
+sfr.data_writing_thread = threading.Thread(
+    name="background", target=sfr.data_writing_thread_method
+)
 
-    start_time = time()
-    while True:
-        cur_pos = actuator.get_pos()
-        cur_pos_mm = actuator.steps_to_mm(cur_pos)
-        tar_pos = actuator.get_variable_by_name("target_position")
-        cur_vel = actuator.get_vel()
-        cur_vel_mms = actuator.vel_to_mms(cur_vel)
-        tar_vel = actuator.get_variable_by_name("target_velocity")
-        max_speed = actuator.get_variable_by_name("max_speed")
-        max_decel = actuator.get_variable_by_name("max_decel")
-        max_accel = actuator.get_variable_by_name("max_accel")
-        step_mode = actuator.get_variable_by_name("step_mode")
-        vin_voltage = actuator.get_variable_by_name("vin_voltage")
-        gap = (cur_pos_mm + start_gap) / 1000.0  # set gap whether or not test is active
-
-        # visc_volume = min(sample_volume, HAMMER_AREA * gap)
-        visc_volume = (
-            sample_volume  # Carbopol keeps being predicted to over spread too soon
-        )
-        # yield_stress_guess = (
-        #     1.5
-        #     * math.sqrt(math.pi)
-        #     * OpenScale.grams_to_N(force)
-        #     * (gap) ** 2.5
-        #     / ((visc_volume) ** 1.5)
-        # )  # Scott (1935)
-        yield_stress_guess = (
-            OpenScale.grams_to_N(force) * gap / visc_volume / math.sqrt(3)
-        )  # Meeten (2000)
-
-        with open(
-            "data/" + csv_name, "a"
-        ) as datafile:  # write time & current details to csv
-            cur_time = time()
-            cur_duration = cur_time - start_time
-
-            output_params = [
-                cur_time,
-                cur_duration,
-                cur_pos_mm,
-                cur_pos,
-                tar_pos,
-                cur_vel_mms,
-                cur_vel,
-                tar_vel,
-                max_speed,
-                max_decel,
-                max_accel,
-                step_mode,
-                vin_voltage,
-                force,
-                target,
-                start_gap / 1000.0,
-                gap,
-                eta_guess,
-                yield_stress_guess,
-                sample_volume,
-                visc_volume,
-                test_active,
-                spread_beyond_hammer,
-            ]
-            dataline = ",".join(map(str, output_params)) + "\n"
-            datafile.write(dataline)
-            # print(dataline)
-
-        times.append(cur_duration)
-        forces.append(force)
-        gaps.append(gap)
-        yieldStressGuesses.append(yield_stress_guess)
-
-        sleep(0.02)
-
-        if (time() - start_time) >= 7200 or (
-            (not ac.is_alive()) and (time() - start_time) > 1
-        ):
-            print("Time since started: {:.0f}".format(time() - start_time))
-            print("Actuator thread dead? {:}".format(not ac.is_alive()))
-            print("end of background")
-            break
-
-    print("=" * 20 + " BACKGROUND IS DONE " + "=" * 20)
-
-
-lc = threading.Thread(name="loadcell", target=load_cell_thread)
-ac = threading.Thread(name="actuator", target=actuator_thread)
-bkg = threading.Thread(name="background", target=background)
-
-lc.start()
-ac.start()
-bkg.start()
+sfr.load_cell_thread.start()
+sfr.actuator_thread.start()
+sfr.data_writing_thread.start()
 
 max_time_window = 30
 ax1 = fig.add_subplot(1, 1, 1)
@@ -321,9 +149,9 @@ color3 = "C2"
 
 
 def animate(i):
-    global ax1, ax2, times, forces, gaps, yieldStressGuesses
+    global ax1, ax2, ax3, sfr
 
-    if len(times) <= 0:
+    if len(sfr.times) <= 0:
         return
 
     ax1.clear()
@@ -336,10 +164,10 @@ def animate(i):
     #     forces.pop(0)
     #     gaps.pop(0)
 
-    timesTemp = times[:]
-    forcesTemp = forces[:]
-    gapsTemp = gaps[:]
-    yieldStressGuessesTemp = yieldStressGuesses[:]
+    timesTemp = sfr.times[:]
+    forcesTemp = sfr.forces[:]
+    gapsTemp = sfr.gaps[:]
+    yieldStressGuessesTemp = sfr.yieldStressGuesses[:]
 
     # print("{:7d}: {:}".format(len(timesTemp), timesTemp[-1] - timesTemp[0]))
 
@@ -355,7 +183,7 @@ def animate(i):
     plt.xlim(min(timesTemp), max(max(timesTemp), max_time_window))
     plt.title("Sample: {:}".format(sample_str))
 
-    ax1.set_ylim((-0.5, max(2 * target, max(forcesTemp))))
+    # ax1.set_ylim((-0.5, max(2 * sfr.target, max(forcesTemp))))
     ax2.set_ylim((0, 1000 * max(gapsTemp)))
 
     # Color y-ticks
