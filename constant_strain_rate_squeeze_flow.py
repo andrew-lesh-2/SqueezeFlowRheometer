@@ -1,7 +1,6 @@
 import threading
 from time import sleep, time
 import math
-from LoadCell.openscale import OpenScale
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from squeezeflowrheometer import SqueezeFlowRheometer

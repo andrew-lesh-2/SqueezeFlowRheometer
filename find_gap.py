@@ -1,6 +1,5 @@
 import json
 import threading
-import pytic
 from time import sleep, time
 import math
 from datetime import datetime

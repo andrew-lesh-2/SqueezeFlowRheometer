@@ -2,7 +2,6 @@ import serial
 from time import time
 import json
 import threading
-import pytic
 
 # import time
 from time import sleep, time

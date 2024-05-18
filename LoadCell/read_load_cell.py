@@ -2,7 +2,6 @@ import openscale
 from time import time
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from matplotlib import style
 import threading
 
 scale = openscale.OpenScale()
