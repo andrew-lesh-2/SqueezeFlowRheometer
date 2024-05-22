@@ -100,6 +100,8 @@ def actuator_thread():
     gap_m = (sfr.get_pos_mm() + sfr.start_gap) / 1000.0  # current gap in m
     v = 0
 
+    step_start_time = time()
+
     while True:
         # Check if force beyond max amount
         if abs(sfr.force) > sfr.force_limit:
@@ -125,7 +127,7 @@ def actuator_thread():
             sfr.end_test(fig)
             return
 
-        if time() - sfr.start_time >= sfr.step_duration or (1000 * gap_m) <= min_gap:
+        if time() - step_start_time >= sfr.step_duration or (1000 * gap_m) <= min_gap:
             print("Test complete, stopping.")
             sfr.end_test(fig)
             return
