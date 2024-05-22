@@ -14,9 +14,9 @@ if __name__ == "__main__":
     min_gap = SqueezeFlowRheometer.find_num_in_str(
         input("What's the target minimum gap in mm? ")
     )
-    start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
-    test_duration = SqueezeFlowRheometer.input_step_duration(sfr.default_duration)
-    sample_volume = SqueezeFlowRheometer.input_sample_volume()
+    sfr.start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
+    sfr.step_duration = SqueezeFlowRheometer.input_step_duration(sfr.default_duration)
+    sfr.sample_volume = SqueezeFlowRheometer.input_sample_volume()
     sample_str = input("What's the sample made of? This will be used for file naming. ")
 
     # # Get test details from settings file & config file
@@ -34,7 +34,7 @@ if __name__ == "__main__":
         sfr.get_day_date_str()
         + "_"
         + "constant_strain_rate_squeeze_flow_{:}_{:d}mL_{:}mm".format(
-            sample_str, round(sample_volume * 1e6), min_gap
+            sample_str, round(sfr.sample_volume * 1e6), min_gap
         )
     )
 
@@ -74,33 +74,30 @@ def actuator_thread():
         if sfr.force > force_threshold:
             sfr.test_active = True
             break
-        if abs(sfr.get_pos_mm()) >= start_gap:
+        if abs(sfr.get_pos_mm()) >= sfr.start_gap:
             print("Hit the hard-stop without ever exceeding threshold force, stopping.")
             sfr.end_test(fig)
             return
 
     print("Force threshold met, switching over to constant strain rate.")
-    initial_gap = start_gap + sfr.get_pos_mm()
+    initial_gap = sfr.start_gap + sfr.get_pos_mm()
 
     print(initial_gap)
     print(min_gap)
-    strain_rate = math.log(initial_gap / min_gap) / test_duration
+    strain_rate = math.log(initial_gap / min_gap) / sfr.step_duration
 
     # Now that test is active, throw away most of the pre-test data.
     data_keep_time = 2  # how many seconds to keep
     data_rate = 10  # roughly how many datapoints I record per second
     keep_datapoints = data_keep_time * data_rate  # how many datapoints to keep
-    if len(times) > keep_datapoints:
+    if len(sfr.times) > keep_datapoints:
         # only throw away points if they're older than data_keep_time
-        times = times[-keep_datapoints:]
-        forces = forces[-keep_datapoints:]
-        gaps = gaps[-keep_datapoints:]
-        yieldStressGuesses = yieldStressGuesses[-keep_datapoints:]
+        sfr.times = sfr.times[-keep_datapoints:]
+        sfr.forces = sfr.forces[-keep_datapoints:]
+        sfr.gaps = sfr.gaps[-keep_datapoints:]
+        sfr.yieldStressGuesses = sfr.yieldStressGuesses[-keep_datapoints:]
 
-    gap_m = (sfr.get_pos_mm() + start_gap) / 1000.0  # current gap in m
-    ref_gap = max(
-        ref_gap, gap_m
-    )  # if sample volume is large, might need to increase the ref gap
+    gap_m = (sfr.get_pos_mm() + sfr.start_gap) / 1000.0  # current gap in m
     v = 0
 
     while True:
@@ -116,8 +113,8 @@ def actuator_thread():
 
         # Check if went too far
         cur_pos_mm = sfr.get_pos_mm()
-        gap_m = (cur_pos_mm + start_gap) / 1000.0  # current gap in m
-        if cur_pos_mm >= start_gap:
+        gap_m = (cur_pos_mm + sfr.start_gap) / 1000.0  # current gap in m
+        if cur_pos_mm >= sfr.start_gap:
             print("Hit the hard-stop, stopping.")
             sfr.end_test(fig)
             return
@@ -128,7 +125,7 @@ def actuator_thread():
             sfr.end_test(fig)
             return
 
-        if time() - sfr.start_time >= test_duration or (1000 * gap_m) <= min_gap:
+        if time() - sfr.start_time >= sfr.step_duration or (1000 * gap_m) <= min_gap:
             print("Test complete, stopping.")
             sfr.end_test(fig)
             return

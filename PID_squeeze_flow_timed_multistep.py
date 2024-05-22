@@ -21,13 +21,13 @@ if __name__ == "__main__":
     targets = SqueezeFlowRheometer.input_targets(sfr.units, sfr.test_settings)
     sfr.target = targets[step_id]
     sfr.start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
-    test_duration = SqueezeFlowRheometer.input_step_duration(sfr.default_duration)
+    sfr.step_duration = SqueezeFlowRheometer.input_step_duration(sfr.default_duration)
     sfr.sample_volume = SqueezeFlowRheometer.input_sample_volume()
     sample_str = input("What's the sample made of? This will be used for file naming. ")
 
     # # Get test details from settings file & config file
     # targets = settings["targets"]
-    # test_duration = settings["test_duration"]
+    # sfr.step_duration = settings["test_duration"]
     # sample_str = settings["sample_str"]
     # start_gap = float(scale.config["gap"])
 
@@ -143,7 +143,7 @@ def actuator_thread():
             sfr.end_test(fig)
             return
 
-        if time() - step_start_time >= test_duration:
+        if time() - step_start_time >= sfr.step_duration:
             step_id = step_id + 1
             if step_id < len(targets):
                 print("Step time limit reached, next step.")

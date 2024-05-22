@@ -38,6 +38,9 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         self.date: datetime = datetime.now()
         self.test_settings: dict = {}
         self.default_duration: float = 0
+        """Default length of a test in seconds, set by test settings json file. User may simply accept the default instead of choosing it themselves"""
+        self.step_duration: float = 0
+        """Selected length of test in seconds"""
 
         ## Threads for simultaneous actuator control, load cell reading, and data writing
         self.actuator_thread: threading.Thread
@@ -59,7 +62,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         """How long the test has been going on"""
         self.force: float = 0
         """The current force in g"""
-        self.target: float
+        self.target: float = 0
         """The current target value. For constant-force tests, this is a force in grams. For set-gap tests, this is the target gap in mm"""
         self.gap: float = 0
         """The current gap in m"""
@@ -241,7 +244,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
             step_dur = default_duration
         else:
             step_dur = SqueezeFlowRheometer.find_num_in_str(dur_line)
-        print("Test duration is {:.2f}s".format(step_dur))
+        print("Step duration is {:.2f}s".format(step_dur))
         return step_dur
 
     def input_retract_start_gap(sample_volume, settings) -> float:
