@@ -397,7 +397,10 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         """
         self.test_active = False
 
-        self.save_figure(fig)
+        try:
+            self.save_figure(fig)
+        except:
+            print("Failed to save figure.")
         self.go_home_quiet_down()
 
     def get_day_date_str(self) -> str:
@@ -438,12 +441,18 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         Returns:
             float: yield stress assuming perfect slip and quasisteady
         """
-        return (
-            OpenScale.grams_to_N(self.force)
-            * self.gap
-            / self.visc_volume
-            / math.sqrt(3)
-        )
+        try:
+            return (
+                OpenScale.grams_to_N(self.force)
+                * self.gap
+                / self.visc_volume
+                / math.sqrt(3)
+            )
+        except ZeroDivisionError:
+            print("No usable volume for yield stress computation")
+            return 0
+        except:
+            return 0
 
     def get_no_slip_yield_stress(self) -> float:
         """Compute the yield stress assuming no slip and quasisteady. From Scott (1935)
@@ -451,13 +460,19 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         Returns:
             float: yield stress assuming no slip and quasisteady
         """
-        return (
-            1.5
-            * math.sqrt(math.pi)
-            * OpenScale.grams_to_N(self.force)
-            * (self.gap) ** 2.5
-            / ((self.visc_volume) ** 1.5)
-        )
+        try:
+            return (
+                1.5
+                * math.sqrt(math.pi)
+                * OpenScale.grams_to_N(self.force)
+                * (self.gap) ** 2.5
+                / ((self.visc_volume) ** 1.5)
+            )
+        except ZeroDivisionError:
+            print("No usable volume for yield stress computation")
+            return 0
+        except:
+            return 0
 
     def get_gap(self, pos: float = None) -> float:
         """Computes the current gap in meters

@@ -15,7 +15,12 @@ class OpenScale:
     """The maximum acceptable jump in grams between two force readings"""
 
     def __init__(self):
-        self.ser = serial.Serial(self.get_COM_port(), 115200)
+        try:
+            self.ser = serial.Serial(self.get_COM_port(), 115200)
+        except serial.SerialException():
+            print(
+                "Could not open port to read load cell. Is the OpenScale board plugged in to the computer?"
+            )
 
         self.outlier_threshold = (
             100  # g, if a measurement is beyond this limit, throw it out
