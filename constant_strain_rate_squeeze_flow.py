@@ -31,7 +31,7 @@ if __name__ == "__main__":
     sfr.heartbeat()
 
     output_file_name_base = (
-        sfr.get_day_date_str()
+        sfr.get_second_date_str()
         + "_"
         + "constant_strain_rate_squeeze_flow_{:}_{:d}mL_{:}mm".format(
             sample_str, round(sfr.sample_volume * 1e6), min_gap

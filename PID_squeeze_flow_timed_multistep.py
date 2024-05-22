@@ -38,7 +38,7 @@ if __name__ == "__main__":
     sfr.heartbeat()
 
     output_file_name_base = (
-        sfr.get_day_date_str()
+        sfr.get_second_date_str()
         + "_"
         + "sfrObjectTestPID_{:}_{:d}mL".format(
             sample_str, round(sfr.sample_volume * 1e6)

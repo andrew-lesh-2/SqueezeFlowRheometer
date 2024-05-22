@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # Set up files/folders
     output_file_name_base = (
-        sfr.get_day_date_str()
+        sfr.get_second_date_str()
         + "_"
         + "set_gap_squeeze_flow{:}_{:d}mL".format(
             sample_str, round(sfr.sample_volume * 1e6)

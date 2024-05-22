@@ -36,7 +36,7 @@ if __name__ == "__main__":
     sfr.heartbeat()
 
     output_file_name_base = (
-        sfr.get_day_date_str()
+        sfr.get_second_date_str()
         + "_"
         + "retraction_{:}_{:d}mL_{:d}mm_{:d}mms".format(
             sample_str,

@@ -18,7 +18,7 @@ if __name__ == "__main__":
     sfr.halt_and_set_position(0)
     sfr.heartbeat()
 
-    output_file_name_base = sfr.get_day_date_str() + "_" + "rigidity_test"
+    output_file_name_base = sfr.get_second_date_str() + "_" + "rigidity_test"
 
     sfr.data_file_name = output_file_name_base + "-data.csv"
 

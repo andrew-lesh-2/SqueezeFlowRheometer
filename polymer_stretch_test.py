@@ -37,7 +37,7 @@ if __name__ == "__main__":
     sfr.heartbeat()
 
     output_file_name_base = (
-        sfr.get_day_date_str()
+        sfr.get_second_date_str()
         + "_"
         + "polymer_stretch_test_{:}_{:d}mL_{:d}mm".format(
             sample_str, round(sfr.sample_volume * 1e6), round(target_gap)
