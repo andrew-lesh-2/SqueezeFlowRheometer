@@ -71,7 +71,7 @@ def actuator_thread():
         if abs(sfr.force) > sfr.force_limit:
             sfr.end_test(fig)
             break
-        if sfr.force > force_threshold:
+        if abs(sfr.force) > force_threshold:
             sfr.test_active = True
             break
         if abs(sfr.get_pos_mm()) >= sfr.start_gap:
