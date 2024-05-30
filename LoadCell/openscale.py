@@ -48,13 +48,18 @@ class OpenScale:
         try:
             with open(self.config_path, "r") as read_file:
                 self.config = json.load(read_file)
-                self.tare_value = self.config["tare"]
-                self.calibration = self.config["calibration"]
-                self.units = self.config["units"]
-                self.outlier_threshold = self.config["max_force"]
-                self.force_limit = (
-                    self.config["max_force"] * self.config["limit_fraction"]
-                )
+                if "tare" in self.config:
+                    self.tare_value = self.config["tare"]
+                if "calibration" in self.config:
+                    self.calibration = self.config["calibration"]
+                if "units" in self.config:
+                    self.units = self.config["units"]
+                if "max_force" in self.config:
+                    self.outlier_threshold = self.config["max_force"]
+                    if "limit_fraction" in self.config:
+                        self.force_limit = (
+                            self.config["max_force"] * self.config["limit_fraction"]
+                        )
         except:
             self.config = {}
         return self.config
@@ -126,8 +131,13 @@ class OpenScale:
         while reading is None:
             reading = self.get_reading()
 
-        self.old_readings.pop(0)
-        self.old_readings.append(self.reading_to_units(reading))
+        if (
+            ("tare" in self.config)
+            and ("calibration" in self.config)
+            and ("units" in self.config)
+        ):
+            self.old_readings.pop(0)
+            self.old_readings.append(self.reading_to_units(reading))
         return reading
 
     def get_calibrated_measurement(self) -> float:
@@ -278,6 +288,8 @@ class OpenScale:
         plt.show()
 
         self.config["tare"] = tare_value
+        if "limit_fraction" not in self.config:
+            self.config["limit_fraction"] = 0.8
         with open(self.config_path, "w") as write_file:
             json.dump(self.config, write_file)
 
