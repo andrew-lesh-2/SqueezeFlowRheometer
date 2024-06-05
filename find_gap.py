@@ -74,7 +74,7 @@ def load_cell_thread():
     scale.flush_old_lines()  # and get rid of any others that were generated
     # when we were busy setting up
     while True:
-        force = scale.wait_for_calibrated_measurement(True) * FORCE_UP_SIGN
+        force = scale.wait_for_calibrated_measurement() * FORCE_UP_SIGN
 
         if (time() - start_time) >= 2000 or (
             (not ac.is_alive()) and (not b.is_alive()) and (time() - start_time) > 1
