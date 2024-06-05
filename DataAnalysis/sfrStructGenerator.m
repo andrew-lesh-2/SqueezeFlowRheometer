@@ -26,6 +26,8 @@ function sfrStruct = sfrStructGenerator(filePath,xq,yq)
     %   (before it reaches the sample and after the last step is done)
     activeIndices = strcmpi(sfrDataTable.TestActive_,'true');
     sfrDataTable = sfrDataTable(activeIndices,:);
+
+    sfrStruct = sfrEmptyStructGenerator();
     
     % Get data straight from the file
     sfrStruct.t = sfrDataTable.ElapsedTime;
