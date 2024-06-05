@@ -1,14 +1,19 @@
-import serial
-import serial.tools.list_ports
+"""Provides OpenScale class, wrapper for interfacing with OpenScale board"""
+
 from time import time
 import json
 import re
+import math
+import serial
+import serial.tools.list_ports
 import numpy as np
 import matplotlib.pyplot as plt
-import math
 
 
 class OpenScale:
+    """Wrapper for interfacing with OpenScale board and getting calibrated
+    force readings in coherent units from the load cell"""
+
     OLD_READING_KEEP_AMOUNT = 2
     """How many old readings to keep"""
     OUTLIER_JUMP_THRESHOLD = 10
@@ -19,7 +24,8 @@ class OpenScale:
             self.ser = serial.Serial(self.get_COM_port(), 115200)
         except serial.SerialException():
             print(
-                "Could not open port to read load cell. Is the OpenScale board plugged in to the computer?"
+                "Could not open port to read load cell. Is the "
+                "OpenScale board plugged in to the computer?"
             )
 
         self.outlier_threshold = (
@@ -29,7 +35,7 @@ class OpenScale:
             OpenScale.OLD_READING_KEEP_AMOUNT + 1
         )  # also have to store current value
 
-        self.config_path = "LoadCell\config.json"
+        self.config_path = "LoadCell\\config.json"
         """Location of load cell config file"""
         self.config: dict
         """Dict of configuration and calibration data for load cell"""
@@ -45,6 +51,7 @@ class OpenScale:
         self.load_config()
 
     def load_config(self) -> dict:
+        """Load load cell calibration and configuration info from file"""
         try:
             with open(self.config_path, "r") as read_file:
                 self.config = json.load(read_file)
@@ -76,6 +83,7 @@ class OpenScale:
         """
         return self.ser.readline()
 
+    @staticmethod
     def ser_to_reading(serial_line: bytes) -> int:
         """Takes in serial line and returns raw reading reported therein
 
@@ -86,8 +94,8 @@ class OpenScale:
                 int: the load cell reading in that line
         """
         try:
-            numString = serial_line.decode("utf-8")[:-3]  # just get the actual content
-            reading = int(numString)
+            num_string = serial_line.decode("utf-8")[:-3]  # just get the actual content
+            reading = int(num_string)
             return reading
         except:
             print(serial_line)
@@ -106,6 +114,7 @@ class OpenScale:
                 float: calibrated measurement in units the load cell is calibrated to
         """
 
+        # pylint: disable=broad-exception-raised
         if (
             ("tare" not in self.config)
             or ("calibration" not in self.config)
@@ -114,7 +123,7 @@ class OpenScale:
             raise Exception(
                 "Load cell has not been calibrated, cannot report a calibrated measurement."
             )
-        if reading == None:
+        if reading is None:
             return None
         return (reading - self.tare_value) / self.calibration
 
@@ -127,6 +136,7 @@ class OpenScale:
         return OpenScale.ser_to_reading(self.get_line())
 
     def wait_for_reading(self) -> int:
+        """Wait aas long as needed to get next load cell reading."""
         reading = None
         while reading is None:
             reading = self.get_reading()
@@ -151,11 +161,8 @@ class OpenScale:
         self.old_readings.append(meas)
         return meas
 
-    def wait_for_calibrated_measurement(self, non_outlier: bool = True) -> float:
+    def wait_for_calibrated_measurement(self) -> float:
         """Waits for the next valid reading and returns the calibrated measurement
-
-        Args:
-            non_outlier (bool, optional): Whether to wait for a force within a reasonable margin. Defaults to True.
 
         Returns:
             float: force measurement in units chosen during calibration
@@ -176,23 +183,23 @@ class OpenScale:
             measurement (float): _description_
 
         Returns:
-            bool: True if it's an outlier (too far from prior measurements), False if it's a real measurement
+            bool: True if it's an outlier (too far from prior measurements),
+            False if it's a real measurement
         """
         return not any(
-            [
-                (
-                    (old is not None)  # make sure we're comparing to an actual value
-                    and (
-                        abs(measurement - (old if old is not None else 0))
-                        <= OpenScale.OUTLIER_JUMP_THRESHOLD
-                    )
+            (
+                (old is not None)  # make sure we're comparing to an actual value
+                and (
+                    abs(measurement - (old if old is not None else 0))
+                    <= OpenScale.OUTLIER_JUMP_THRESHOLD
                 )
-                for old in self.old_readings[
-                    0:-1
-                ]  # don't include current reading, which is the last one in the list
-            ]
+            )
+            for old in self.old_readings[
+                0:-1
+            ]  # don't include current reading, which is the last one in the list
         )  # if it's too far from any of the previous readings
 
+    @staticmethod
     def grams_to_N(f: float) -> float:
         """Takes in force in grams and converts to Newtons
 
@@ -204,87 +211,67 @@ class OpenScale:
         """
         return 0.00980665 * f
 
-    def tare(self, wait_time: int = 120, N: int = 1000) -> float:
+    def tare(self, wait_time: int = 120, n: int = 1000) -> float:
         """Performs taring of the load cell. Saves tare value
 
         Args:
             wait_time (int, optional): Time to wait for load cell creep to occur. Defaults to 120.
-            N (int, optional): Number of samples to average over. Defaults to 1000.
+            n (int, optional): Number of samples to average over. Defaults to 1000.
 
         Returns:
             float: tare value - the average reading when the load cell has no force applied
         """
 
-        total = 0
-
         print(
-            "Taking first {:d} seconds to let load cell creep happen. This will lead to a more accurate tare value.".format(
-                wait_time
-            )
+            f"Taking first {wait_time:d} seconds to let load cell creep happen. "
+            "This will lead to a more accurate tare value."
         )
-        START_TIME = time()
-        while time() - START_TIME <= wait_time:
-            remaining = wait_time - (time() - START_TIME)
-            line = self.get_line()
-            print("{:5.1f}: {:}".format(remaining, line))
-        self.flush_old_lines()  # and clear any extra lines that may have been generated, we don't need them
+        start_time = time()
+        while time() - start_time <= wait_time:
+            remaining = wait_time - (time() - start_time)
+            print(f"{remaining:5.1f}: {self.get_line()}")
+        self.flush_old_lines()  # and clear any extra lines that may
+        # have been generated, we don't need them
 
-        readings = [0] * N
+        readings = [0] * n
         print("Now recording values for taring")
-        for i in range(N):
-            try:
-                reading = self.wait_for_reading()
-            except:
-                pass  # I don't care if the load cell hasn't yet been calibrated when I'm taring
-            readings[i] = reading
-            print("{:5d}: {:8d}".format(i, reading))
+        for i in range(n):
+            readings[i] = self.wait_for_reading()
+            print(f"{i:5d}: {readings[i]:8d}")
 
         # Throw out top 1% and bottom 1%
         remove_rate = 0.01
-        readings_sorted = sorted(readings)
-        readings = readings_sorted[
-            math.floor(remove_rate * N) : math.floor((1 - remove_rate) * N)
+        readings = sorted(readings)
+        readings = readings[
+            math.floor(remove_rate * n) : math.floor((1 - remove_rate) * n)
         ]
         print(
-            "Keeping the middle {:.0%} of samples to remove outliers due to noise".format(
-                1 - 2 * remove_rate
-            )
+            f"Keeping the middle {(1 - 2 * remove_rate):.0%} of samples "
+            "to remove outliers due to noise"
         )
 
-        # tare_value = total / N
         tare_value = sum(readings) / len(readings)
-        print("The tare value is {:.2f}".format(tare_value))
+        print(f"The tare value is {tare_value:.2f}")
 
         reading_std = np.std(readings)
         max_reading = max(readings)
         min_reading = min(readings)
-        print(
-            "min: {:}, max: {:}, standard dev: {:}".format(
-                min_reading, max_reading, reading_std
-            )
-        )
+        print(f"min: {min_reading}, max: {max_reading}, standard dev: {reading_std}")
         readings_over = sorted(i for i in readings if i >= tare_value + reading_std)
         readings_under = sorted(
             (i for i in readings if i <= tare_value - reading_std), reverse=True
         )
         print(
-            "Number over 1std: {:}, Number under 1std: {:}, total outside 1std: {:}".format(
-                len(readings_over),
-                len(readings_under),
-                len(readings_over) + len(readings_under),
-            )
+            f"Number over 1std: {len(readings_over)}, Number under 1std: {len(readings_under)}, "
+            f"total outside 1std: {(len(readings_over) + len(readings_under))}"
         )
         print(
-            "Number within 1std: {:}".format(
-                len(readings) - len(readings_over) - len(readings_under)
-            )
+            f"Number within 1std: {(len(readings) - len(readings_over) - len(readings_under))}"
         )
-        # print(readings_over)
-        # print(readings_under)
         plt.hist(sorted(np.array(readings) - tare_value), 50)
         plt.xlabel("Deviation from the mean")
         plt.ylabel("Number of samples")
-        plt.title("Middle {:.0%} of readings".format(1 - 2 * remove_rate))
+        plt.title(f"Middle {(1 - 2 * remove_rate):.0%} of readings")
         plt.show()
 
         self.config["tare"] = tare_value
@@ -297,13 +284,14 @@ class OpenScale:
         return tare_value
 
     def calibrate(
-        self, tare_first: bool = False, N: int = 1000, report_duration: int = 10
+        self, tare_first: bool = False, n: int = 1000, report_duration: int = 10
     ) -> float:
         """Performs calibration of load cell
 
         Args:
-            N (int, optional): Number of samples to average over. Defaults to 1000.
-            report_duration (int, optional): Amount of time to report values after calibration is complete. Defaults to 10.
+            n (int, optional): Number of samples to average over. Defaults to 1000.
+            report_duration (int, optional): Amount of time to report values after
+            calibration is complete. Defaults to 10.
 
         Returns:
             float: _description_
@@ -315,7 +303,7 @@ class OpenScale:
             input(
                 "Please remove any weights you had placed. Press enter to being taring process."
             )
-            self.tare(N=N)
+            self.tare(n=n)
             print("Taring complete. Now to calibrate.")
 
         total = 0
@@ -336,71 +324,58 @@ class OpenScale:
         self.config["units"] = self.units
 
         # Also set max force limit while you're at it
-        max_force_str = input(
-            "Enter the load cell capacity in {:}: ".format(self.units)
-        )
+        max_force_str = input(f"Enter the load cell capacity in {self.units}: ")
         self.outlier_threshold = abs(float(max_force_str))
         self.config["max_force"] = self.outlier_threshold
         self.force_limit = self.outlier_threshold * self.config["limit_fraction"]
 
         for i in range(10):  # ignore the first few lines, they're not data
             self.get_line()
-        self.flush_old_lines()  # and clear any extra lines that may have been generated, we don't need them
+        self.flush_old_lines()  # and clear any extra lines that may have been
+        # generated, we don't need them
 
-        readings = [0] * N
-        for i in range(N):
+        readings = [0] * n
+        for i in range(n):
             # reading = self.get_reading()
             reading = self.wait_for_reading() - self.tare_value
             readings[i] = reading
-            print("{:5d}: {:10.1f}".format(i, reading))
+            print(f"{i:5d}: {reading:10.1f}")
             total += reading - self.tare_value
 
         # Throw out top 1% and bottom 1%
         remove_rate = 0.01
-        readings_sorted = sorted(readings)
-        readings = readings_sorted[
-            math.floor(remove_rate * N) : math.floor((1 - remove_rate) * N)
+        readings = sorted(readings)
+        readings = readings[
+            math.floor(remove_rate * n) : math.floor((1 - remove_rate) * n)
         ]
         print(
-            "Keeping the middle {:.0%} of samples to remove outliers due to noise".format(
-                1 - 2 * remove_rate
-            )
+            f"Keeping the middle {(1 - 2 * remove_rate):.0%} of "
+            "samples to remove outliers due to noise"
         )
 
         # average = total / N
         average = sum(readings) / len(readings)
-        print("The calibration average is {:.2f}".format(average))
+        print(f"The calibration average is {average:.2f}")
 
         reading_std = np.std(readings)
         max_reading = max(readings)
         min_reading = min(readings)
-        print(
-            "min: {:}, max: {:}, standard dev: {:}".format(
-                min_reading, max_reading, reading_std
-            )
-        )
+        print(f"min: {min_reading}, max: {max_reading}, standard dev: {reading_std}")
         readings_over = sorted(i for i in readings if i >= average + reading_std)
         readings_under = sorted(
             (i for i in readings if i <= average - reading_std), reverse=True
         )
         print(
-            "Number over 1std: {:}, Number under 1std: {:}, total outside 1std: {:}".format(
-                len(readings_over),
-                len(readings_under),
-                len(readings_over) + len(readings_under),
-            )
+            f"Number over 1std: {len(readings_over)}, Number under 1std: {len(readings_under)}, "
+            f"total outside 1std: {(len(readings_over) + len(readings_under))}"
         )
         print(
-            "Number within 1std: {:}".format(
-                len(readings) - len(readings_over) - len(readings_under)
-            )
+            f"Number within 1std: {(len(readings) - len(readings_over) - len(readings_under))}"
         )
-        # print(readings_over)
-        # print(readings_under)
         plt.hist(sorted(np.array(readings) - average), 50)
         plt.xlabel("Deviation from the mean")
         plt.ylabel("Number of samples")
-        plt.title("Middle {:.0%} of readings".format(1 - 2 * remove_rate))
+        plt.title(f"Middle {(1 - 2 * remove_rate):.0%} of readings")
         plt.show()
 
         calibration = -average / cal_weight
@@ -408,32 +383,28 @@ class OpenScale:
         with open(self.config_path, "w") as write_file:
             json.dump(self.config, write_file)
 
-        print("The calibration value is {:.2f}".format(calibration))
+        print(f"The calibration value is {calibration:.2f}")
         input(
-            "You should now change the weights. For the next 10 seconds, I will print out the weight I am measuring. Press enter to begin."
+            "You should now change the weights. For the next 10 seconds, "
+            "the measured weight will be constantly printed. Press enter to begin."
         )
         self.flush_old_lines()
 
-        START_TIME = time()
-        while time() - START_TIME <= report_duration:
-            # reading = int(ser.readline().decode("utf-8")[:-3])
-            # weight = -(reading - self.tare_value) / calibration
-            weight = -self.get_calibrated_measurement()
+        start_time = time()
+        while (time() - start_time) <= report_duration:
+            # pylint: disable=invalid-unary-operand-type
             weight = -self.wait_for_calibrated_measurement()
-            if weight is None:  # if startup garbage not gone yet
-                continue
-            print("{:6.2f}{:}".format(weight, self.units))
+            print(f"{weight:6.2f}{self.units}")
 
         return calibration
 
     def check_tare(self):
         """Check if load cell is within tare, otherwise tare it."""
-        weight = self.wait_for_calibrated_measurement(True)
+        weight = self.wait_for_calibrated_measurement()
         if abs(weight) > 0.5:
             ans = input(
-                "The load cell is out of tare! Current reading is {:.2f}{:}. Do you want to tare it now? (y/n) ".format(
-                    weight, self.units
-                )
+                f"The load cell is out of tare! Current reading is {weight:.2f}{self.units}. "
+                "Do you want to tare it now? (y/n) "
             )
             if ans == "y":
                 self.tare()

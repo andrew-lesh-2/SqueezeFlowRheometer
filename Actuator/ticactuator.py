@@ -1,10 +1,14 @@
-from pytic import PyTic
+"""Provides wrapper for existing pytic package, but with useful helper
+functions to allow operations in coherent units"""
+
 from time import sleep
 import math
+from pytic import PyTic
 
 
 class TicActuator(PyTic):
-    """Wrapper for existing pytic package, but with useful helper functions to allow operations in coherent units"""
+    """Wrapper for existing pytic package, but with useful helper
+    functions to allow operations in coherent units"""
 
     def __init__(
         self, step_size: float = 0.01, step_mode: int = 0, current_limit: int = 576

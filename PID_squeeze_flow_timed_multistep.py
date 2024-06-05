@@ -102,7 +102,7 @@ def actuator_thread():
         sfr.times = sfr.times[-keep_datapoints:]
         sfr.forces = sfr.forces[-keep_datapoints:]
         sfr.gaps = sfr.gaps[-keep_datapoints:]
-        sfr.yieldStressGuesses = sfr.yieldStressGuesses[-keep_datapoints:]
+        sfr.yield_stress_guesses = sfr.yield_stress_guesses[-keep_datapoints:]
 
     step_start_time = time()
     step_id = 0
@@ -242,7 +242,7 @@ def animate(i):
     timesTemp = sfr.times[:]
     forcesTemp = sfr.forces[:]
     gapsTemp = sfr.gaps[:]
-    yieldStressGuessesTemp = sfr.yieldStressGuesses[:]
+    yieldStressGuessesTemp = sfr.yield_stress_guesses[:]
 
     # print("{:7d}: {:}".format(len(timesTemp), timesTemp[-1] - timesTemp[0]))
 

@@ -1,31 +1,37 @@
+"""Provides SqueezeFlowRheometer class which combines operations of OpenScale
+and TicActuator classes to operate load cell and actuator from one object"""
+
 import re
 import math
 from pathlib import Path
 from datetime import datetime
-
 import threading
 from time import sleep, time
 import json
-
+import os
 from matplotlib.figure import Figure
 from LoadCell.openscale import OpenScale
 from Actuator.ticactuator import TicActuator
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import os
+
+from PID_squeeze_flow_timed import HAMMER_AREA
 
 
 # class SqueezeFlowRheometer:
 
 
 class SqueezeFlowRheometer(OpenScale, TicActuator):
+    """Combines operations of OpenScale
+    and TicActuator classes to operate load cell and actuator from one object"""
 
     HAMMER_RADIUS = 25e-3
     """Radius of circular top plate in m"""
     HAMMER_AREA = math.pi * HAMMER_RADIUS**2
     """Area of circular top plate in m^2"""
     FORCE_UP_SIGN = 1
-    """Sign of a positive force. This should be 1 or -1, and is used to compute velocity based on force"""
+    """Sign of a positive force. This should be 1 or -1, and is
+    used to compute velocity based on force"""
     MAX_TEST_DURATION = 7200
     """Max test duration in seconds. Once the test is this long, it will end."""
     DEFAULT_STEP_DURATION = 300
@@ -38,9 +44,14 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         self.date: datetime = datetime.now()
         self.test_settings: dict = {}
         self.default_duration: float = 0
-        """Default length of a test in seconds, set by test settings json file. User may simply accept the default instead of choosing it themselves"""
+        """Default length of a test in seconds, set by test settings json file. User may simply
+        accept the default instead of choosing it themselves"""
         self.step_duration: float = 0
         """Selected length of test in seconds"""
+        self.figure_name: str = ""
+        """File name for figure"""
+        self.figure_path: str = ""
+        """File path for saved figure"""
 
         ## Threads for simultaneous actuator control, load cell reading, and data writing
         self.actuator_thread: threading.Thread
@@ -63,13 +74,15 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         self.force: float = 0
         """The current force in g"""
         self.target: float = 0
-        """The current target value. For constant-force tests, this is a force in grams. For set-gap tests, this is the target gap in mm"""
+        """The current target value. For constant-force tests, this is a force in grams.
+        For set-gap tests, this is the target gap in mm"""
         self.gap: float = 0
         """The current gap in m"""
         self.eta_guess: float = 0
         """A guess at the fluid's Newtonian viscosity"""
         self.yield_stress_guess: float = 0
-        """A guess at the fluid's yield stress. May assume no slip or perfect slip depending on code."""
+        """A guess at the fluid's yield stress. May assume no slip or perfect slip
+        depending on code."""
         self.visc_volume: float = 0
         """The amount of sample that remains between the plates. Used to recognize squeezeout"""
         self.spread_beyond_hammer: bool = False
@@ -87,9 +100,12 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         self.variable_KP = lambda er, tar: (self.a + self.b) / 2 + (
             self.a - self.b
         ) / 2 * math.tanh(self.c * ((er / tar) ** 2 - self.d))
-        """Given the current error and the current target force, get a proportional control parameter. This is a function instead of a constant because this was found to work better due to the nonlinear nature of squeeze flow."""
+        """Given the current error and the current target force, get a proportional control
+        parameter. This is a function instead of a constant because this was found to work
+        better due to the nonlinear nature of squeeze flow."""
         self.ref_gap: float = 1
-        """Parameter used to slow controller response as gap gets smaller. Defaulted to 1 to prevent divide-by-zero error"""
+        """Parameter used to slow controller response as gap gets smaller. Defaulted to 1 to
+        prevent divide-by-zero error"""
         self.error: float = 0
         """How far from the target value the force is. For PID Loop"""
         self.K_P: float = 0
@@ -110,7 +126,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         """List of force values for the test thus far. Used to liveplot test data"""
         self.gaps: list[float] = []
         """List of gap values for the test thus far. Used to liveplot test data"""
-        self.yieldStressGuesses: list[float] = []
+        self.yield_stress_guesses: list[float] = []
         """List of computed yield stress values for the test thus far. Used to liveplot test data"""
 
         ## Initialize load cell reading
@@ -132,6 +148,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         self.data_file_name: str
         self.figure_folder = self.get_figure_folder_path()
 
+    @staticmethod
     def input_targets(scale_unit: str, settings: dict) -> list[float]:
         """Takes in a list of strictly increasing force targets from the user
 
@@ -146,8 +163,9 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         while not target_list_acceptable:
             # Take in values
             targets_string = input(
-                "Please give the set of force targets in [{:}] you want to test, separated by commas and/or spaces, or press enter to use the default values: ".format(
-                    scale_unit
+                (
+                    f"Please give the set of force targets in [{scale_unit}] you want to test, "
+                    "separated by commas and/or spaces, or press enter to use the default values: "
                 )
             )
             if "config" in targets_string.lower() or len(targets_string) <= 0:
@@ -159,7 +177,8 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
                 targets_str_list = targets_string.split(",")  # split list at commas
                 targets_str_list = list(
                     filter(None, targets_str_list)
-                )  # throw out any empty strings created by a ", " becoming ",," being split into an empty string
+                )  # throw out any empty strings created by a
+                # ", " becoming ",," being split into an empty string
                 targets_list = [
                     float(tar) for tar in targets_str_list
                 ]  # parse string to float
@@ -173,19 +192,19 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
             strictly_increasing = all(increasing_bools)
             if not strictly_increasing:
                 print(
-                    "The set of forces must be strictly increasing. Every force target must be higher than the previous value."
+                    "The set of forces must be strictly increasing. Every"
+                    " force target must be higher than the previous value."
                 )
                 target_list_acceptable = False
             print()
 
         targets_list_printable = ", ".join([str(tar) for tar in targets_list])
         print(
-            "The list of target forces in [{:}] is {:}".format(
-                scale_unit, targets_list_printable
-            )
+            f"The list of target forces in [{scale_unit}] is {targets_list_printable}"
         )
         return targets_list
 
+    @staticmethod
     def find_num_in_str(inp: str) -> float:
         """Finds a number in a string potentially containing additional exraneous text
 
@@ -199,6 +218,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         res = temp.search(inp).group(0)
         return abs(float(res))
 
+    @staticmethod
     def input_start_gap(scale) -> float:
         """Gets start gap in mm from user.
 
@@ -215,6 +235,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         print("Starting gap is {:.2f}mm".format(gap))
         return gap
 
+    @staticmethod
     def input_sample_volume() -> float:
         """Gets sample volume in mL from user
 
@@ -247,19 +268,20 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         print("Step duration is {:.2f}s".format(step_dur))
         return step_dur
 
+    @staticmethod
     def input_retract_start_gap(sample_volume, settings) -> float:
         """Gets gap to approach to and retract from from the user for a retraction test.
 
         Returns:
             float: the target gap in mm
         """
-        plateDiameter = 0.050  # m
         min_gap = (
-            1000 * 4 * sample_volume / (math.pi * plateDiameter**2)
+            1000 * sample_volume / HAMMER_AREA
         )  # mm, minimum gap before sample is squeeze beyond the plate
         while True:
             target_gap_line = input(
-                "Enter the target gap to retract from in [mm]. If you want to use the gap in the settings file, just hit Enter: "
+                "Enter the target gap to retract from in [mm]. If "
+                "you want to use the gap in the settings file, just hit Enter: "
             )
             if "settings" in target_gap_line.lower() or len(target_gap_line) <= 0:
                 target_gap = float(settings["retract_gap_mm"])
@@ -268,16 +290,16 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
 
             if target_gap < min_gap:
                 print(
-                    "That gap is too small! The sample will squeeze out past the edge of the plate. Try a gap larger than {:.2f}".format(
-                        min_gap
-                    )
+                    "That gap is too small! The sample will squeeze out past the "
+                    f"edge of the plate. Try a gap larger than {min_gap:.2f}"
                 )
             else:
                 break
-        print("Target gap is {:.2f}mm".format(target_gap))
+        print(f"Target gap is {target_gap:.2f}mm")
         return target_gap
 
-    def input_retract_speed(settings) -> float:
+    @staticmethod
+    def input_retract_speed(settings: dict) -> float:
         """Gets retraction speed from the user for a retraction experiment.
 
         Returns:
@@ -286,59 +308,17 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         target_speed_line = input(
             "Enter the retraction speed in [mm/s]. If you want to use the speed in the settings file, just hit Enter: "
         )
+
+        # pylint: disable=unsubscriptable-object
         if "settings" in target_speed_line.lower() or len(target_speed_line) <= 0:
             target_speed = abs(float(settings["retract_speed_mms"]))
         else:
             target_speed = abs(SqueezeFlowRheometer.find_num_in_str(target_speed_line))
-        print("Retraction speed is {:.1f}mm/s".format(target_speed))
+        print(f"Retraction speed is {target_speed:.1f}mm/s")
         return target_speed
 
-    def create_data_file(file_name: str, file_heading: str):
-        """Create a .csv data file for an SFR test
-
-        Args:
-            file_name (str): file name with the .csv extension
-            file_heading (str): first row of .csv file, a comma separated string of headers
-        """
-        with open("data/" + file_name, "a") as datafile:
-            datafile.write(file_heading)
-
-    def create_figures_folder(date: datetime) -> str:
-        folder_path = "data/Figures/{:}".format(
-            SqueezeFlowRheometer.get_day_date_str(date)
-        )
-        Path(folder_path).mkdir(parents=True, exist_ok=True)
-        return folder_path
-
-    def get_day_date_str(date: datetime) -> str:
-        """Gets a formatted date string down to the day
-
-        Args:
-            date (datetime): a datetime object storing the time for the test to
-
-        Returns:
-            str: yyyy-mm-dd formatted date string
-        """
-        return date.strftime("%Y-%m-%d")
-
-    def get_second_date_str(date: datetime) -> str:
-        """Gets a formatted date string down to the second. Hours are in 24-hour time
-
-        Args:
-            date (datetime): a datetime object storing the time for the test to
-
-        Returns:
-            str: yyyy-mm-dd_HH-MM-SS formatted date string
-        """
-        return date.strftime("%Y-%m-%d_%H-%M-%S")
-
-    def write_data_to_file(file_name: str, output_params: list) -> str:
-        with open("data/" + file_name, "a") as datafile:
-            dataline = ",".join(map(str, output_params)) + "\n"
-            datafile.write(dataline)
-            return dataline
-
     def load_settings(self):
+        """Load device settings"""
         with open(self.settings_path, "r") as read_file:
             self.test_settings = json.load(read_file)
 
@@ -381,6 +361,11 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         return self.figure_folder
 
     def save_figure(self, fig: Figure):
+        """Saves live-plotted figure
+
+        Args:
+            fig (Figure): Figure to be saved
+        """
         self.figure_name = self.data_file_name.replace(
             "-data.csv", "-livePlottedFigure.png"
         )
@@ -492,7 +477,8 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         """Records data to csv
 
         Args:
-            include_PID_values (bool, optional): Whether or not to include PID values like error and K_P in the data output. Only useful for PID-controlled tests. Defaults to False.
+            include_PID_values (bool, optional): Whether or not to include PID values like error
+            and K_P in the data output. Only useful for PID-controlled tests. Defaults to False.
         """
 
         self.start_time = time()
@@ -510,7 +496,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
             vin_voltage = self.get_variable_by_name("vin_voltage")
             self.gap = self.get_gap(cur_pos_mm)  # set gap whether or not test is active
 
-            # self.visc_volume = min(self.sample_volume, SqueezeFlowRheometer.HAMMER_AREA * self.gap)
+            # self.visc_volume=min(self.sample_volume,SqueezeFlowRheometer.HAMMER_AREA*self.gap)
             self.visc_volume = (
                 self.sample_volume  # Carbopol keeps being predicted to over spread too soon
             )
@@ -546,7 +532,8 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
                 self.spread_beyond_hammer,
             ]
 
-            # Only output these if the test requests it, otherwise they're probably not in use and therefore meaningless
+            # Only output these if the test requests it, otherwise they're
+            # probably not in use and therefore meaningless
             if include_PID_values:
                 output_params.extend(
                     [
@@ -564,19 +551,15 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
             self.times.append(cur_duration)
             self.forces.append(self.force)
             self.gaps.append(self.gap)
-            self.yieldStressGuesses.append(self.yield_stress_guess)
+            self.yield_stress_guesses.append(self.yield_stress_guess)
 
             sleep(0.02)
 
             if (time() - self.start_time) >= SqueezeFlowRheometer.MAX_TEST_DURATION or (
                 (not self.actuator_thread.is_alive()) and (time() - self.start_time) > 1
             ):
-                print("Time since started: {:.0f}".format(time() - self.start_time))
-                print(
-                    "Actuator thread dead? {:}".format(
-                        not self.actuator_thread.is_alive()
-                    )
-                )
+                print(f"Time since started: {(time() - self.start_time):.0f}")
+                print(f"Actuator thread dead? {(not self.actuator_thread.is_alive())}")
                 print("End of data-writing thread")
                 break
         print("=" * 20 + " BACKGROUND IS DONE " + "=" * 20)
@@ -585,22 +568,23 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         """Continuously reads load cell and reports the upward force on the load cell
 
         Args:
-            compute_errors (bool, optional): Whether to compute force error and integrated error / derivative error, which are used for PID force control. Defaults to False.
+            compute_errors (bool, optional): Whether to compute force error and integrated
+            error / derivative error, which are used for PID force control. Defaults to False.
         """
 
         for _ in range(10):  # get rid of first few lines that aren't readings
             self.get_line()
-        self.flush_old_lines()  # and get rid of any others that were generated when we were busy setting up
+        self.flush_old_lines()  # and get rid of any others that
+        # were generated when we were busy setting up
 
         old_error = self.error
-        """Error from previous frame, used for derivative & integral calculation"""
 
         cur_time = time()
         prev_time = cur_time
 
         while True:
             self.force = (
-                self.wait_for_calibrated_measurement(True)
+                self.wait_for_calibrated_measurement()
                 * SqueezeFlowRheometer.FORCE_UP_SIGN
             )
 

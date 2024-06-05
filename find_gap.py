@@ -1,7 +1,8 @@
+"""Finds the geometry gap"""
+
 import json
 import threading
 from time import sleep, time
-import math
 from datetime import datetime
 import re
 from Actuator.ticactuator import TicActuator
@@ -12,23 +13,23 @@ from LoadCell.openscale import OpenScale
 date = datetime.now()
 date_str = date.strftime("%Y-%m-%d_%H-%M-%S")
 """timestamp string for experiment start time in yyyy-mm-dd_HH:MM:SS format"""
-csv_name = date_str + "_" + "find_gap" + "-data.csv"
-config_path = "LoadCell\config.json"
+CSV_NAME = date_str + "_" + "find_gap" + "-data.csv"
+CONFIG_PATH = "LoadCell\\config.json"
 
-HAMMER_RADIUS = 25e-3  # m
-HAMMER_AREA = math.pi * HAMMER_RADIUS**2  # m^2
+N_FIND = 25
 
-
-force = 0
+force: float = 0
 """Current force reading. Positive is a force pushing up on the load cell"""
 FORCE_UP_SIGN = -1
-"""Sign of a positive force. This should be 1 or -1, and is used to compute velocity based on force"""
-start_gap = 0
+"""Sign of a positive force. This should be 1 or -1, and is used to compute
+velocity based on force"""
+start_gap: float = 0
 """Initial distance away from hard stop."""
-gap = 0
+gap: float = 0
 """Current gap between hammer and hard stop"""
 
 if __name__ == "__main__":
+
     scale = OpenScale()
 
     # target_line = input("Enter the target force in [{:}]: ".format(scale.units))
@@ -41,7 +42,7 @@ if __name__ == "__main__":
     temp = re.compile("[0-9.]+")
     res = temp.search(gap_line).group(0)
     start_gap = float(res)
-    print("Starting gap is {:.2f}mm".format(start_gap))
+    print(f"Starting gap is {start_gap:.2f}mm")
 
     actuator = TicActuator(step_mode=5)
     actuator.set_max_accel_mmss(20, True)
@@ -51,10 +52,13 @@ if __name__ == "__main__":
     actuator.halt_and_set_position(0)
     actuator.heartbeat()
 
-    with open("data/" + csv_name, "a") as datafile:
+    with open("data/" + CSV_NAME, "a") as datafile:
         datafile.write(
-            "Current Time, Elapsed Time, Current Position (mm), Current Position, Target Position, Current Velocity (mm/s), Current Velocity, Target Velocity, Max Speed, Max Decel, Max Accel, Step Mode, Voltage In (mV), Current Force ({:}) Current Gap (m)\n".format(
-                scale.units
+            (
+                "Current Time, Elapsed Time, Current Position (mm), Current Position,"
+                "Target Position, Current Velocity (mm/s), Current Velocity, Target Velocity,"
+                "Max Speed, Max Decel, Max Accel, Step Mode, Voltage In (mV), Current Force"
+                f"({scale.units}) Current Gap (m)\n"
             )
         )
 
@@ -65,13 +69,10 @@ def load_cell_thread():
 
     start_time = time()
 
-    for i in range(10):  # get rid of first few lines that aren't readings
+    for _ in range(10):  # get rid of first few lines that aren't readings
         scale.get_line()
-    scale.flush_old_lines()  # and get rid of any others that were generated when we were busy setting up
-
-    cur_time = time()
-    prev_time = cur_time
-    outlier_threshold = 100
+    scale.flush_old_lines()  # and get rid of any others that were generated
+    # when we were busy setting up
     while True:
         force = scale.wait_for_calibrated_measurement(True) * FORCE_UP_SIGN
 
@@ -114,17 +115,16 @@ def actuator_thread():
             return
         if abs(force) > force_threshold:
             hit_pos = actuator.get_pos_mm()
-            print("Hit something at {:.2f}mm".format(hit_pos))
+            print(f"Hit something at {hit_pos:.2f}mm")
             actuator.move_to_mm(hit_pos + backoff_dist)
             break
         # print("{:6.2f} >=? {:6.2f}".format(get_pos_mm() / 1000.0, start_gap))
     print("Force threshold met, switching over to fine approach.")
 
-    N_find = 25
-    gap_list = [0] * N_find
+    gap_list = [0] * N_FIND
     slowdown_factor = 0.05  # what factor to slow down by on fine approach
 
-    for i in range(N_find):
+    for i in range(N_FIND):
         actuator.set_vel_mms(approach_velocity * slowdown_factor)
         while True:
             # Check if force beyond max amount
@@ -137,36 +137,33 @@ def actuator_thread():
             if abs(force) > force_threshold:
                 hit_pos = actuator.get_pos_mm()
                 gap_list[i] = hit_pos
-                if i < N_find - 1:
+                if i < N_FIND - 1:
                     print(
-                        "Hit something at {:.4f}mm, backing up to check again".format(
-                            hit_pos
-                        )
+                        f"Hit something at {hit_pos:.4f}mm, backing up to check again"
                     )
                 else:
-                    print("Hit something at {:.4f}mm, done checking".format(hit_pos))
+                    print(f"Hit something at {hit_pos:.4f}mm, done checking")
                 actuator.move_to_mm(hit_pos + backoff_dist)
                 break
 
-            out_str = "{:2d}: {:7.3f}{:}, pos = {:8.3f}mm".format(
-                i + 1, force, scale.units, actuator.get_pos_mm()
-            )
+            gap = actuator.get_pos_mm()
+            out_str = f"{(i + 1):2d}: {force:7.3f}{scale.units}, pos = {gap:8.3f}mm"
 
             print(out_str)
             # print(actuator.variables.error_status)
             actuator.heartbeat()
 
-    mean_gap = abs(sum(gap_list) / N_find)
-    print("The mean gap is {:f}mm".format(mean_gap))
+    mean_gap = abs(sum(gap_list) / N_FIND)
+    print(f"The mean gap is {mean_gap:f}mm")
 
     # Save gap in config file
     try:
-        with open(config_path, "r") as read_file:
+        with open(CONFIG_PATH, "r") as read_file:
             config = json.load(read_file)
     except:
         config = {}
     config["gap"] = mean_gap
-    with open(config_path, "w") as write_file:
+    with open(CONFIG_PATH, "w") as write_file:
         json.dump(config, write_file)
 
     actuator.go_home_quiet_down()
@@ -175,7 +172,6 @@ def actuator_thread():
 
 def background():
     """Records data to csv"""
-    global actuator
 
     start_time = time()
     while True:
@@ -192,7 +188,7 @@ def background():
         vin_voltage = actuator.variables.vin_voltage
 
         with open(
-            "data/" + csv_name, "a"
+            "data/" + CSV_NAME, "a"
         ) as datafile:  # write time & current details to csv
             cur_time = time()
             cur_duration = cur_time - start_time

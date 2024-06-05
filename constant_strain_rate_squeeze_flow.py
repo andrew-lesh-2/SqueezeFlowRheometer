@@ -1,3 +1,6 @@
+"""Performs a squeeze flow test with a constant axial strain rate from the top of the
+sample to a prescribed gap in a prescribed time"""
+
 import threading
 from time import sleep, time
 import math
@@ -6,6 +9,8 @@ import matplotlib.animation as animation
 from squeezeflowrheometer import SqueezeFlowRheometer
 
 fig = plt.figure(figsize=(7.2, 4.8))
+
+min_gap: float = 0
 
 if __name__ == "__main__":
     sfr = SqueezeFlowRheometer()
@@ -33,8 +38,9 @@ if __name__ == "__main__":
     output_file_name_base = (
         sfr.get_second_date_str()
         + "_"
-        + "constant_strain_rate_squeeze_flow_{:}_{:d}mL_{:}mm".format(
-            sample_str, round(sfr.sample_volume * 1e6), min_gap
+        + (
+            f"constant_strain_rate_squeeze_flow_{sample_str}"
+            "_{round(sfr.sample_volume * 1e6):d}mL_{min_gap}mm"
         )
     )
 
@@ -43,16 +49,19 @@ if __name__ == "__main__":
     sfr.create_figures_folder()
 
     sfr.create_data_file(
-        "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,Max Accel,Step Mode,Voltage In (mV),Current Force ({:}),Target Force ({:}),Start Gap (m),Current Gap (m),Viscosity (Pa.s),Yield Stress (Pa),Sample Volume (m^3),Viscosity Volume (m^3), Test Active?, Spread beyond hammer?\n".format(
-            sfr.units, sfr.units
+        (
+            "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,"
+            "Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,"
+            f"Max Accel,Step Mode,Voltage In (mV),Current Force ({sfr.units}),"
+            f"Target Force ({sfr.units}),Start Gap (m),Current Gap (m),Viscosity (Pa.s),"
+            "Yield Stress (Pa),Sample Volume (m^3),Viscosity Volume (m^3),"
+            "Test Active?, Spread beyond hammer?\n"
         )
     )
 
 
 def actuator_thread():
     """Drives actuator"""
-    # global gap, eta_guess, error, int_error, der_error, sample_volume, test_active, spread_beyond_hammer, visc_volume, yield_stress_guess, times, gaps, forces
-    global sfr, fig
 
     print("Waiting 2 seconds before starting")
     sleep(2)
@@ -95,7 +104,7 @@ def actuator_thread():
         sfr.times = sfr.times[-keep_datapoints:]
         sfr.forces = sfr.forces[-keep_datapoints:]
         sfr.gaps = sfr.gaps[-keep_datapoints:]
-        sfr.yieldStressGuesses = sfr.yieldStressGuesses[-keep_datapoints:]
+        sfr.yield_stress_guesses = sfr.yield_stress_guesses[-keep_datapoints:]
 
     gap_m = (sfr.get_pos_mm() + sfr.start_gap) / 1000.0  # current gap in m
     v = 0
@@ -105,11 +114,7 @@ def actuator_thread():
     while True:
         # Check if force beyond max amount
         if abs(sfr.force) > sfr.force_limit:
-            print(
-                "Force was too large, stopping - {:3.2f}{:}".format(
-                    sfr.force, sfr.units
-                )
-            )
+            print(f"Force was too large, stopping - {sfr.force:3.2f}{sfr.units}")
             sfr.end_test(fig)
             return
 
@@ -135,8 +140,9 @@ def actuator_thread():
         v = -(1000 * gap_m) * strain_rate
         sfr.set_vel_mms(v)
 
-        out_str = "{:6.2f}{:}, gap = {:6.2f}, v = {:11.5f}, strain rate = {:}".format(
-            sfr.force, sfr.units, gap_m * 1000, v, strain_rate
+        out_str = (
+            f"{sfr.force:6.2f}{sfr.units}, gap = {(gap_m * 1000):6.2f},"
+            " v = {v:11.5f}, strain rate = {strain_rate}"
         )
         print(out_str)
 
@@ -155,18 +161,18 @@ sfr.load_cell_thread.start()
 sfr.actuator_thread.start()
 sfr.data_writing_thread.start()
 
-max_time_window = 30
+MAX_TIME_WINDOW = 30
 ax1 = fig.add_subplot(1, 1, 1)
 ax2 = ax1.twinx()
 ax3 = ax1.twinx()
 
-color1 = "C0"
-color2 = "C1"
-color3 = "C2"
+COLOR1 = "C0"
+COLOR2 = "C1"
+COLOR3 = "C2"
 
 
-def animate(i):
-    global ax1, ax2, ax3, sfr
+def animate():
+    """Plot data throughout the test"""
 
     if len(sfr.times) <= 0:
         return
@@ -175,45 +181,39 @@ def animate(i):
     ax2.clear()
     ax3.clear()
 
-    # Throw away data & timestamps that are too old.
-    # while times[-1] - times[0] > max_time_window:
-    #     times.pop(0)
-    #     forces.pop(0)
-    #     gaps.pop(0)
-
-    timesTemp = sfr.times[:]
-    forcesTemp = sfr.forces[:]
-    gapsTemp = sfr.gaps[:]
-    yieldStressGuessesTemp = sfr.yieldStressGuesses[:]
+    times_temp = sfr.times[:]
+    forces_temp = sfr.forces[:]
+    gaps_temp = sfr.gaps[:]
+    yield_stress_guesses_temp = sfr.yield_stress_guesses[:]
 
     # print("{:7d}: {:}".format(len(timesTemp), timesTemp[-1] - timesTemp[0]))
 
     ax1.set_xlabel("Time [s]")
-    ax1.set_ylabel("Force [g]", color=color1)
-    ax2.set_ylabel("Gap [mm]", color=color2)
-    ax3.set_ylabel("Yield Stress [Pa]", color=color3)
+    ax1.set_ylabel("Force [g]", color=COLOR1)
+    ax2.set_ylabel("Gap [mm]", color=COLOR2)
+    ax3.set_ylabel("Yield Stress [Pa]", color=COLOR3)
 
-    ax1.plot(timesTemp, forcesTemp, color1, label="Force")
-    ax2.plot(timesTemp, [1000 * g for g in gapsTemp], color2, label="Gap")
-    ax3.plot(timesTemp, yieldStressGuessesTemp, color3, label="Yield Stress")
+    ax1.plot(times_temp, forces_temp, COLOR1, label="Force")
+    ax2.plot(times_temp, [1000 * g for g in gaps_temp], COLOR2, label="Gap")
+    ax3.plot(times_temp, yield_stress_guesses_temp, COLOR3, label="Yield Stress")
 
-    plt.xlim(min(timesTemp), max(max(timesTemp), max_time_window))
-    plt.title("Sample: {:}".format(sample_str))
+    plt.xlim(min(times_temp), max(times_temp, MAX_TIME_WINDOW))
+    plt.title(f"Sample: {sample_str}")
 
     # ax1.set_ylim((-0.5, max(2 * target, max(forcesTemp))))
-    ax2.set_ylim((0, 1000 * max(gapsTemp)))
+    ax2.set_ylim((0, 1000 * max(gaps_temp)))
 
     # Color y-ticks
-    ax1.tick_params(axis="y", colors=color1)
-    ax2.tick_params(axis="y", colors=color2)
-    ax3.tick_params(axis="y", colors=color3)
+    ax1.tick_params(axis="y", colors=COLOR1)
+    ax2.tick_params(axis="y", colors=COLOR2)
+    ax3.tick_params(axis="y", colors=COLOR3)
 
     # Color y-axes
-    ax1.spines["left"].set_color(color1)
+    ax1.spines["left"].set_color(COLOR1)
     ax2.spines["left"].set_alpha(0)  # hide second left y axis to show first one
-    ax2.spines["right"].set_color(color2)
+    ax2.spines["right"].set_color(COLOR2)
     ax3.spines["left"].set_alpha(0)  # hide third left y axis to show first one
-    ax3.spines["right"].set_color(color3)
+    ax3.spines["right"].set_color(COLOR3)
 
     # ax3.spines["right"].set_position(
     #     ("axes", 1.1)
