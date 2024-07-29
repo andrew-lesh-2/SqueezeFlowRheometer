@@ -162,11 +162,7 @@ def actuator_thread():
             sfr.int_error = math.copysign(int_threshold, sfr.int_error)
 
         # vel_P = -K_P * error
-        l_error = sfr.error
-        error_threshold = 2
-        if abs(l_error) > error_threshold:
-            l_error = math.copysign(error_threshold, l_error)
-        vel_P = -sfr.variable_K_P(l_error, step_increase) * l_error
+        vel_P = -sfr.variable_K_P(sfr.error, step_increase) * sfr.error
         """Proportional component of velocity response"""
         vel_I = -sfr.K_I * sfr.int_error
         """Integral component of velocity response"""
@@ -178,9 +174,11 @@ def actuator_thread():
             sfr.der_error = 0
             vel_D = 0
 
-        # v_new = vel_P + vel_D + vel_I
-        v_new = vel_P + vel_I
-        v_new = v_new * (gap_m / sfr.ref_gap) ** 2
+        # v_new = vel_P + vel_D + vel_I # modified PID control
+        v_new = vel_P + vel_I  # modified PI control
+        v_new = (
+            v_new * (gap_m / sfr.ref_gap) ** 2
+        )  # slow the response as the gap gets thinner
         # v_new = min(v_new, 0)  # Only go downward
         sfr.set_vel_mms(v_new)
 
