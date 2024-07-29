@@ -8,6 +8,7 @@ import serial
 import serial.tools.list_ports
 import numpy as np
 import matplotlib.pyplot as plt
+import os.path
 
 
 class OpenScale:
@@ -35,7 +36,7 @@ class OpenScale:
             OpenScale.OLD_READING_KEEP_AMOUNT + 1
         )  # also have to store current value
 
-        self.config_path = "LoadCell\\config.json"
+        self.config_path = os.path.join("LoadCell", "config.json")
         """Location of load cell config file"""
         self.config: dict
         """Dict of configuration and calibration data for load cell"""
