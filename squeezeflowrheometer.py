@@ -15,7 +15,6 @@ from Actuator.ticactuator import TicActuator
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from PID_squeeze_flow_timed import HAMMER_AREA
 
 
 # class SqueezeFlowRheometer:
@@ -293,7 +292,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
             float: the target gap in mm
         """
         min_gap = (
-            1000 * sample_volume / HAMMER_AREA
+            1000 * sample_volume / SqueezeFlowRheometer.HAMMER_AREA
         )  # mm, minimum gap before sample is squeeze beyond the plate
         while True:
             target_gap_line = input(
