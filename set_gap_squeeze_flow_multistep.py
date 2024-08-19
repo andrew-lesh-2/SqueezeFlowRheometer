@@ -1,12 +1,12 @@
+"""Performs a sequence of stress-relaxation steps. Moves to a given gap, then waits there to measure
+how the force response evolves."""
+
 import threading
 from time import sleep, time
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from squeezeflowrheometer import SqueezeFlowRheometer
+from matplotlib import animation
 import numpy as np
-
-sample_str = ""
-"""What the sample is made of. Used in filename."""
+from squeezeflowrheometer import SqueezeFlowRheometer
 
 targets: list[float] = []
 """Set of target gaps"""
@@ -25,8 +25,8 @@ if __name__ == "__main__":
     # sample_str = settings["sample_str"]
     # start_gap = float(scale.config["gap"])
 
-    # first_gap = sample_volume ** (1.0 / 3.0) * 1000  # mm
-    first_gap = 3
+    first_gap = sfr.sample_volume ** (1.0 / 3.0) * 1000  # mm
+    # first_gap = 3
     min_gap = sfr.sample_volume / SqueezeFlowRheometer.HAMMER_AREA * 1000  # mm
     targets = np.geomspace(first_gap, 0.5 * min_gap, 20).tolist()
     sfr.target = targets[0]
@@ -42,10 +42,7 @@ if __name__ == "__main__":
     # Set up files/folders
     output_file_name_base = (
         sfr.get_second_date_str()
-        + "_"
-        + "set_gap_squeeze_flow{:}_{:d}mL".format(
-            sample_str, round(sfr.sample_volume * 1e6)
-        )
+        + f"_set_gap_squeeze_flow{sample_str}_{round(sfr.sample_volume * 1e6):d}mL"
     )
     sfr.data_file_name = output_file_name_base + "-data.csv"
     sfr.create_figures_folder()
@@ -58,7 +55,6 @@ if __name__ == "__main__":
 
 def actuator_thread():
     """Drives actuator"""
-    global sfr, targets, step_id, fig
 
     print("Waiting 2 seconds before starting")
     sleep(2)
@@ -88,7 +84,7 @@ def actuator_thread():
     )
     max_strain_rate = 0.05  # 1/s
     for t in targets:
-        print("Target gap is {:.2f}mm".format(t))
+        print(f"Target gap is {t:.2f}mm")
 
         target_pos = t - sfr.start_gap
         sfr.target = t
@@ -138,18 +134,18 @@ sfr.load_cell_thread.start()
 sfr.actuator_thread.start()
 sfr.data_writing_thread.start()
 
-max_time_window = 30
+MAX_TIME_WINDOW = 30
 ax1 = fig.add_subplot(1, 1, 1)
 ax2 = ax1.twinx()
 ax3 = ax1.twinx()
 
-color1 = "C0"
-color2 = "C1"
-color3 = "C2"
+COLOR1 = "C0"
+COLOR2 = "C1"
+COLOR3 = "C2"
 
 
-def animate(i):
-    global ax1, ax2, ax3, sfr
+def animate(_):
+    """Plot data throughout the test"""
 
     if len(sfr.times) <= 0:
         return
@@ -164,39 +160,39 @@ def animate(i):
     #     forces.pop(0)
     #     gaps.pop(0)
 
-    timesTemp = sfr.times[:]
-    forcesTemp = sfr.forces[:]
-    gapsTemp = sfr.gaps[:]
-    yieldStressGuessesTemp = sfr.yield_stress_guesses[:]
+    times_temp = sfr.times[:]
+    forces_temp = sfr.forces[:]
+    gaps_temp = sfr.gaps[:]
+    yield_stress_guesses_temp = sfr.yield_stress_guesses[:]
 
     # print("{:7d}: {:}".format(len(timesTemp), timesTemp[-1] - timesTemp[0]))
 
     ax1.set_xlabel("Time [s]")
-    ax1.set_ylabel("Force [g]", color=color1)
-    ax2.set_ylabel("Gap [mm]", color=color2)
-    ax3.set_ylabel("Yield Stress [Pa]", color=color3)
+    ax1.set_ylabel("Force [g]", color=COLOR1)
+    ax2.set_ylabel("Gap [mm]", color=COLOR2)
+    ax3.set_ylabel("Yield Stress [Pa]", color=COLOR3)
 
-    ax1.plot(timesTemp, forcesTemp, color1, label="Force")
-    ax2.plot(timesTemp, [1000 * g for g in gapsTemp], color2, label="Gap")
-    ax3.plot(timesTemp, yieldStressGuessesTemp, color3, label="Yield Stress")
+    ax1.plot(times_temp, forces_temp, COLOR1, label="Force")
+    ax2.plot(times_temp, [1000 * g for g in gaps_temp], COLOR2, label="Gap")
+    ax3.plot(times_temp, yield_stress_guesses_temp, COLOR3, label="Yield Stress")
 
-    plt.xlim(min(timesTemp), max(max(timesTemp), max_time_window))
-    plt.title("Sample: {:}".format(sample_str))
+    plt.xlim(min(times_temp), max(*times_temp, MAX_TIME_WINDOW))
+    plt.title(f"Sample: {sample_str}")
 
     # ax1.set_ylim((-0.5, max(2 * sfr.target, max(forcesTemp))))
-    ax2.set_ylim((0, 1000 * max(gapsTemp)))
+    ax2.set_ylim((0, 1000 * max(gaps_temp)))
 
     # Color y-ticks
-    ax1.tick_params(axis="y", colors=color1)
-    ax2.tick_params(axis="y", colors=color2)
-    ax3.tick_params(axis="y", colors=color3)
+    ax1.tick_params(axis="y", colors=COLOR1)
+    ax2.tick_params(axis="y", colors=COLOR2)
+    ax3.tick_params(axis="y", colors=COLOR3)
 
     # Color y-axes
-    ax1.spines["left"].set_color(color1)
+    ax1.spines["left"].set_color(COLOR1)
     ax2.spines["left"].set_alpha(0)  # hide second left y axis to show first one
-    ax2.spines["right"].set_color(color2)
+    ax2.spines["right"].set_color(COLOR2)
     ax3.spines["left"].set_alpha(0)  # hide third left y axis to show first one
-    ax3.spines["right"].set_color(color3)
+    ax3.spines["right"].set_color(COLOR3)
 
     # ax3.spines["right"].set_position(
     #     ("axes", 1.1)

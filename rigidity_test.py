@@ -1,7 +1,9 @@
+"""Test the rigidity of the system by directly pushing against the hard stop."""
+
 import threading
 from time import sleep
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from matplotlib import animation
 from squeezeflowrheometer import SqueezeFlowRheometer
 
 fig = plt.figure(figsize=(7.2, 4.8))
@@ -10,7 +12,7 @@ if __name__ == "__main__":
     sfr = SqueezeFlowRheometer()
 
     # Get test details from user
-    start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
+    sfr.start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
 
     sfr.check_tare()
 
@@ -33,7 +35,6 @@ if __name__ == "__main__":
 
 def actuator_thread():
     """Drives actuator"""
-    global sfr, fig
 
     print("Waiting 2 seconds before starting")
     sleep(2)
@@ -45,7 +46,7 @@ def actuator_thread():
 
     # Move to just above the plate
     print("Approaching start point")
-    sfr.move_to_mm(-abs(start_gap - backoff_dist))
+    sfr.move_to_mm(-abs(sfr.start_gap - backoff_dist))
     print("Reached start point. Now approaching the plate slowly.")
 
     # Now that test is active, throw away most of the pre-test data.
@@ -63,8 +64,8 @@ def actuator_thread():
     sfr.set_vel_mms(approach_velocity)
     while abs(sfr.force) < sfr.force_limit:
         sfr.heartbeat()
-        gap_mm = sfr.get_pos_mm() + start_gap
-        out_str = "F = {:7.3f}{:}, pos = {:8.3f}mm".format(sfr.force, sfr.units, gap_mm)
+        gap_mm = sfr.get_gap() * 1000
+        out_str = f"F = {sfr.force:7.3f}{sfr.units}, pos = {gap_mm:8.3f}mm"
         print(out_str)
 
     sfr.test_active = False
@@ -88,36 +89,36 @@ sfr.data_writing_thread.start()
 
 ax1 = fig.add_subplot(1, 1, 1)
 
-color1 = "C0"
-color2 = "C1"
+COLOR1 = "C0"
+COLOR2 = "C1"
 
 
-def animate(i):
-    global ax1, sfr
+def animate(_):
+    """Plot data throughout the test"""
 
     if len(sfr.times) <= 0:
         return
 
     ax1.clear()
 
-    forcesTemp = sfr.forces[:]
-    gapsTemp = sfr.gaps[:]
+    forces_temp = sfr.forces[:]
+    gaps_temp = sfr.gaps[:]
 
     ax1.set_xlabel("Distance past zero-point [mm]")
-    ax1.set_ylabel("Force [g]", color=color1)
+    ax1.set_ylabel("Force [g]", color=COLOR1)
 
-    ax1.plot([-1000 * h for h in gapsTemp], forcesTemp, color1, label="Force")
+    ax1.plot([-1000 * h for h in gaps_temp], forces_temp, COLOR1, label="Force")
 
-    plt.xlim((-1000 * max(gapsTemp), -1000 * min(gapsTemp)))
+    plt.xlim((-1000 * max(gaps_temp), -1000 * min(gaps_temp)))
     plt.title("Rigidity Test")
 
     # ax1.set_ylim((-0.5, max(forcesTemp)))
 
     # Color y-ticks
-    ax1.tick_params(axis="y", colors=color1)
+    ax1.tick_params(axis="y", colors=COLOR1)
 
     # Color y-axes
-    # ax1.spines["left"].set_color(color1)
+    # ax1.spines["left"].set_color(COLOR1)
 
     ax1.grid(True)
 
