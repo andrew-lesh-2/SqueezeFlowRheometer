@@ -1,3 +1,6 @@
+"""Performs a squeeze flow test attempting to maintain a target force from a given sequence of
+targets. Maintains each target force for a given duration, then moves to the next target."""
+
 import threading
 from time import sleep, time
 import math
@@ -8,9 +11,8 @@ from squeezeflowrheometer import SqueezeFlowRheometer
 # - Initialization -------------------------------------------
 
 targets = []
-"""Monotonically increasing list of target forces. Will run a test on each force, one after the other."""
-step_id = 0
-"""Which target step the test is currently on. 0 is the first step"""
+"""Monotonically increasing list of target forces.
+Will run a test on each force, one after the other."""
 
 fig = plt.figure(figsize=(7.2, 4.8))
 
@@ -19,7 +21,7 @@ if __name__ == "__main__":
 
     # Get test details from user
     targets = SqueezeFlowRheometer.input_targets(sfr.units, sfr.test_settings)
-    sfr.target = targets[step_id]
+    sfr.target = targets[0]  # start at first step
     sfr.start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
     sfr.step_duration = SqueezeFlowRheometer.input_step_duration(sfr.default_duration)
     sfr.sample_volume = SqueezeFlowRheometer.input_sample_volume()
@@ -58,8 +60,6 @@ if __name__ == "__main__":
 
 def actuator_thread():
     """Drives actuator"""
-    # global gap, eta_guess, error, int_error, der_error, sample_volume, test_active, spread_beyond_hammer, visc_volume, yield_stress_guess, times, gaps, forces
-    global sfr, targets, step_id, fig
 
     print("Waiting 2 seconds before starting")
     sleep(2)
@@ -70,8 +70,6 @@ def actuator_thread():
 
     approach_velocity = -0.5  # mm/s, speed to approach bath of fluid at
     force_threshold = 0.5  # g, force must exceed this for control system to kick in.
-
-    backoff_velocity = 1  # mm/s
 
     # Start by approaching and waiting until force is non-negligible
     sfr.set_vel_mms(approach_velocity)
@@ -105,7 +103,7 @@ def actuator_thread():
         sfr.yield_stress_guesses = sfr.yield_stress_guesses[-keep_datapoints:]
 
     step_start_time = time()
-    step_id = 0
+    step_id = 0  # Which target step the test is currently on. 0 is the first step
     sfr.target = targets[step_id]
     step_increase = (
         sfr.target
@@ -158,12 +156,11 @@ def actuator_thread():
             sfr.int_error = math.copysign(int_threshold, sfr.int_error)
 
         # vel_P = -K_P * error
-        vel_P = -sfr.variable_K_P(sfr.error, step_increase) * sfr.error
-        """Proportional component of velocity response"""
-        vel_I = -sfr.K_I * sfr.int_error
-        """Integral component of velocity response"""
-        vel_D = -sfr.K_D * sfr.der_error
-        """Derivative component of velocity response"""
+        vel_P = (
+            -sfr.variable_K_P(sfr.error, step_increase) * sfr.error
+        )  # Proportional component of velocity response
+        vel_I = -sfr.K_I * sfr.int_error  # Integral component of velocity response
+        vel_D = -sfr.K_D * sfr.der_error  # Derivative component of velocity response
 
         if mute_derivative_term_steps > 0:
             mute_derivative_term_steps = mute_derivative_term_steps - 1
@@ -201,18 +198,18 @@ sfr.load_cell_thread.start()
 sfr.actuator_thread.start()
 sfr.data_writing_thread.start()
 
-max_time_window = 30
+MAX_TIME_WINDOW = 30
 ax1 = fig.add_subplot(1, 1, 1)
 ax2 = ax1.twinx()
 ax3 = ax1.twinx()
 
-color1 = "C0"
-color2 = "C1"
-color3 = "C2"
+COLOR1 = "C0"
+COLOR2 = "C1"
+COLOR3 = "C2"
 
 
-def animate(i):
-    global ax1, ax2, ax3, sfr
+def animate(_):
+    """Plot data throughout the test"""
 
     if len(sfr.times) <= 0:
         return
@@ -221,45 +218,37 @@ def animate(i):
     ax2.clear()
     ax3.clear()
 
-    # Throw away data & timestamps that are too old.
-    # while times[-1] - times[0] > max_time_window:
-    #     times.pop(0)
-    #     forces.pop(0)
-    #     gaps.pop(0)
-
-    timesTemp = sfr.times[:]
-    forcesTemp = sfr.forces[:]
-    gapsTemp = sfr.gaps[:]
-    yieldStressGuessesTemp = sfr.yield_stress_guesses[:]
-
-    # print("{:7d}: {:}".format(len(timesTemp), timesTemp[-1] - timesTemp[0]))
+    times_temp = sfr.times[:]
+    forces_temp = sfr.forces[:]
+    gaps_temp = sfr.gaps[:]
+    yield_stress_guesses_temp = sfr.yield_stress_guesses[:]
 
     ax1.set_xlabel("Time [s]")
-    ax1.set_ylabel("Force [g]", color=color1)
-    ax2.set_ylabel("Gap [mm]", color=color2)
-    ax3.set_ylabel("Yield Stress [Pa]", color=color3)
+    ax1.set_ylabel("Force [g]", color=COLOR1)
+    ax2.set_ylabel("Gap [mm]", color=COLOR2)
+    ax3.set_ylabel("Yield Stress [Pa]", color=COLOR3)
 
-    ax1.plot(timesTemp, forcesTemp, color1, label="Force")
-    ax2.plot(timesTemp, [1000 * g for g in gapsTemp], color2, label="Gap")
-    ax3.plot(timesTemp, yieldStressGuessesTemp, color3, label="Yield Stress")
+    ax1.plot(times_temp, forces_temp, COLOR1, label="Force")
+    ax2.plot(times_temp, [1000 * g for g in gaps_temp], COLOR2, label="Gap")
+    ax3.plot(times_temp, yield_stress_guesses_temp, COLOR3, label="Yield Stress")
 
-    plt.xlim(min(timesTemp), max(max(timesTemp), max_time_window))
-    plt.title("Sample: {:}".format(sample_str))
+    plt.xlim(min(times_temp), max(*times_temp, MAX_TIME_WINDOW))
+    plt.title(f"Sample: {sample_str}")
 
     # ax1.set_ylim((-0.5, max(2 * sfr.target, max(forcesTemp))))
-    ax2.set_ylim((0, 1000 * max(gapsTemp)))
+    ax2.set_ylim((0, 1000 * max(gaps_temp)))
 
     # Color y-ticks
-    ax1.tick_params(axis="y", colors=color1)
-    ax2.tick_params(axis="y", colors=color2)
-    ax3.tick_params(axis="y", colors=color3)
+    ax1.tick_params(axis="y", colors=COLOR1)
+    ax2.tick_params(axis="y", colors=COLOR2)
+    ax3.tick_params(axis="y", colors=COLOR3)
 
     # Color y-axes
-    ax1.spines["left"].set_color(color1)
+    ax1.spines["left"].set_color(COLOR1)
     ax2.spines["left"].set_alpha(0)  # hide second left y axis to show first one
-    ax2.spines["right"].set_color(color2)
+    ax2.spines["right"].set_color(COLOR2)
     ax3.spines["left"].set_alpha(0)  # hide third left y axis to show first one
-    ax3.spines["right"].set_color(color3)
+    ax3.spines["right"].set_color(COLOR3)
 
     # ax3.spines["right"].set_position(
     #     ("axes", 1.1)
@@ -271,7 +260,6 @@ def animate(i):
     ax1.grid(True)
     ax2.grid(False)
     ax3.grid(False)
-
     # plt.axis("tight")
 
 
