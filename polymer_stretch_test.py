@@ -1,6 +1,8 @@
+"""Perform an extensional stress-relaxation test. Extends from start to target gap and waits there
+for chosen duration to see the force change. May be used to study maturation of polymer bridges"""
+
 import threading
 from time import sleep, time
-import json
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from squeezeflowrheometer import SqueezeFlowRheometer
@@ -10,14 +12,9 @@ fig = plt.figure(figsize=(7.2, 4.8))
 if __name__ == "__main__":
     sfr = SqueezeFlowRheometer()
 
-    # Input test values from external settings file
-    settings_path = "test_settings.json"
-    with open(settings_path, "r") as read_file:
-        settings = json.load(read_file)
-
     # Get test details from user
     sfr.start_gap = SqueezeFlowRheometer.input_start_gap(sfr)
-    test_duration = SqueezeFlowRheometer.input_step_duration(sfr.default_duration)
+    sfr.step_duration = SqueezeFlowRheometer.input_step_duration(sfr.default_duration)
     sfr.sample_volume = SqueezeFlowRheometer.input_sample_volume()
     sample_str = input("What's the sample made of? This will be used for file naming. ")
 
@@ -57,7 +54,6 @@ if __name__ == "__main__":
 
 def actuator_thread():
     """Drives actuator"""
-    global sfr, fig
 
     print("Waiting 2 seconds before starting")
     sleep(2)
@@ -70,16 +66,16 @@ def actuator_thread():
     data_keep_time = 0  # how many seconds to keep
     data_rate = 10  # roughly how many datapoints I record per second
     keep_datapoints = data_keep_time * data_rate  # how many datapoints to keep
-    if len(times) > keep_datapoints:
+    if len(sfr.times) > keep_datapoints:
         # only throw away points if they're older than data_keep_time
-        times = times[-keep_datapoints:]
-        forces = forces[-keep_datapoints:]
-        gaps = gaps[-keep_datapoints:]
+        sfr.times = sfr.times[-keep_datapoints:]
+        sfr.forces = sfr.forces[-keep_datapoints:]
+        sfr.gaps = sfr.gaps[-keep_datapoints:]
 
     sfr.test_active = True
 
     # Move from start position to target gap
-    print("Target gap is {:.2f}mm".format(target_gap))
+    print(f"Target gap is {target_gap:.2f}mm")
     target_pos = target_gap - sfr.start_gap
     sfr.heartbeat()
     sfr.move_to_mm(target_pos)
@@ -87,7 +83,7 @@ def actuator_thread():
     print("Reached position, waiting")
 
     rest_start_time = time()
-    while time() - rest_start_time <= test_duration:
+    while time() - rest_start_time <= sfr.step_duration:
         sleep(0.1)
         sfr.heartbeat()
 
@@ -110,16 +106,16 @@ sfr.load_cell_thread.start()
 sfr.actuator_thread.start()
 sfr.data_writing_thread.start()
 
-max_time_window = 30
+MAX_TIME_WINDOW = 30
 ax1 = fig.add_subplot(1, 1, 1)
 ax2 = ax1.twinx()
 
-color1 = "C0"
-color2 = "C1"
+COLOR1 = "C0"
+COLOR2 = "C1"
 
 
-def animate(i):
-    global ax1, ax2, sfr
+def animate(_):
+    """Plot data throughout the test"""
 
     if len(sfr.times) <= 0:
         return
@@ -127,31 +123,31 @@ def animate(i):
     ax1.clear()
     ax2.clear()
 
-    timesTemp = sfr.times[:]
-    forcesTemp = sfr.forces[:]
-    gapsTemp = sfr.gaps[:]
+    times_temp = sfr.times[:]
+    forces_temp = sfr.forces[:]
+    gaps_temp = sfr.gaps[:]
 
     ax1.set_xlabel("Time [s]")
-    ax1.set_ylabel("Force [g]", color=color1)
-    ax2.set_ylabel("Gap [mm]", color=color2)
+    ax1.set_ylabel("Force [g]", color=COLOR1)
+    ax2.set_ylabel("Gap [mm]", color=COLOR2)
 
-    ax1.plot(timesTemp, forcesTemp, color1, label="Force")
-    ax2.plot(timesTemp, [1000 * g for g in gapsTemp], color2, label="Gap")
+    ax1.plot(times_temp, forces_temp, COLOR1, label="Force")
+    ax2.plot(times_temp, [1000 * g for g in gaps_temp], COLOR2, label="Gap")
 
-    plt.xlim(min(timesTemp), max(max(timesTemp), max_time_window))
-    plt.title("Sample: {:}".format(sample_str))
+    plt.xlim(min(times_temp), max(*times_temp, MAX_TIME_WINDOW))
+    plt.title(f"Sample: {sample_str:}")
 
-    ax1.set_ylim((min(forcesTemp), max(forcesTemp)))
-    ax2.set_ylim((0, 1000 * max(gapsTemp)))
+    ax1.set_ylim((min(forces_temp), max(forces_temp)))
+    ax2.set_ylim((0, 1000 * max(gaps_temp)))
 
     # Color y-ticks
-    ax1.tick_params(axis="y", colors=color1)
-    ax2.tick_params(axis="y", colors=color2)
+    ax1.tick_params(axis="y", colors=COLOR1)
+    ax2.tick_params(axis="y", colors=COLOR2)
 
     # Color y-axes
-    ax1.spines["left"].set_color(color1)
+    ax1.spines["left"].set_color(COLOR1)
     ax2.spines["left"].set_alpha(0)  # hide second left y axis to show first one
-    ax2.spines["right"].set_color(color2)
+    ax2.spines["right"].set_color(COLOR2)
 
     ax1.grid(True)
     ax2.grid(False)
