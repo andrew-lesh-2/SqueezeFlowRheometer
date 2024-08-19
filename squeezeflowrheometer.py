@@ -225,7 +225,7 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         Returns:
             float: the start gap in mm
         """
-        gap_line = input(
+        gap_line, gap = SqueezeFlowRheometer.get_user_input(
             "Enter the current gap in [mm]. If you want to use the gap in the config file, just hit Enter: "
         )
         if "config" in gap_line.lower() or len(gap_line) <= 0:
@@ -241,11 +241,31 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         Returns:
             float: sample volume in mL
         """
-        vol_line = input("Enter the sample volume in [mL]: ")
-        sample_vol = SqueezeFlowRheometer.find_num_in_str(vol_line) * 1e-6  # m^3
-        print("Sample volume is {:.2f}mL".format(sample_vol * 1e6))
+        sample_vol = SqueezeFlowRheometer.get_user_input(
+            "Enter the sample volume in [mL]: "
+        )[
+            1
+        ]  # just get the value, ignore the raw response
+        sample_vol = sample_vol * 1e-6  # m^3
+        print(f"Sample volume is {(sample_vol * 1e6):.2f}mL")
         return sample_vol
 
+    @staticmethod
+    def get_user_input(input_prompt: str) -> tuple[str, float]:
+        """Prompt user with input string and return user's input as
+        well as extract a float from the input.
+
+        Args:
+            prompt (str): Prompt to request user input.
+
+        Returns:
+            tuple[str, float]: User's response, as well as an attempt
+            to extract a float from the response.
+        """
+        response: str = input(input_prompt)
+        return response, SqueezeFlowRheometer.find_num_in_str(response)
+
+    @staticmethod
     def input_step_duration(default_duration: float = 300) -> float:
         """Gets duration of each step in seconds from user
 
@@ -255,16 +275,14 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         Returns:
             float: duration of each step in seconds
         """
-        dur_line = input(
-            "Enter the duration of each step in seconds. Simply press Enter for the default of {:}s: ".format(
-                default_duration
-            )
+        dur_line, step_dur = SqueezeFlowRheometer.get_user_input(
+            "Enter the duration of each step in seconds. Simply press Enter"
+            f" for the default of {default_duration}s: "
         )
         if "config" in dur_line.lower() or len(dur_line) <= 0:
             step_dur = default_duration
-        else:
-            step_dur = SqueezeFlowRheometer.find_num_in_str(dur_line)
-        print("Step duration is {:.2f}s".format(step_dur))
+
+        print(f"Step duration is {step_dur:.2f}s")
         return step_dur
 
     @staticmethod
