@@ -39,10 +39,7 @@ if __name__ == "__main__":
 
     output_file_name_base = (
         sfr.get_second_date_str()
-        + "_"
-        + "sfrObjectTestPID_{:}_{:d}mL".format(
-            sample_str, round(sfr.sample_volume * 1e6)
-        )
+        + f"_sfrObjectTestPID_{sample_str}_{round(sfr.sample_volume * 1e6):d}mL"
     )
 
     sfr.data_file_name = output_file_name_base + "-data.csv"
@@ -50,9 +47,12 @@ if __name__ == "__main__":
     sfr.create_figures_folder()
 
     sfr.create_data_file(
-        "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,Max Accel,Step Mode,Voltage In (mV),Current Force ({:}),Target Force ({:}),Start Gap (m),Current Gap (m),Viscosity (Pa.s),Yield Stress (Pa),Sample Volume (m^3),Viscosity Volume (m^3), Test Active?, Spread beyond hammer?, Error, K_P, Integrated Error, K_I, Error Derivative, K_D\n".format(
-            sfr.units, sfr.units
-        )
+        "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,"
+        + "Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,Max Accel,"
+        + f"Step Mode,Voltage In (mV),Current Force ({sfr.units}),Target Force ({sfr.units}),"
+        + "Start Gap (m),Current Gap (m),Viscosity (Pa.s),Yield Stress (Pa),Sample Volume (m^3),"
+        + "Viscosity Volume (m^3),Test Active?,Spread beyond hammer?,Error,K_P,Integrated Error,"
+        + "K_I,Error Derivative,K_D\n"
     )
 
 
@@ -121,11 +121,7 @@ def actuator_thread():
     while True:
         # Check if force beyond max amount
         if abs(sfr.force) > sfr.force_limit:
-            print(
-                "Force was too large, stopping - {:3.2f}{:}".format(
-                    sfr.force, sfr.units
-                )
-            )
+            print(f"Force was too large, stopping - {sfr.force:3.2f}{sfr.units}")
             sfr.end_test(fig)
             return
 
@@ -182,17 +178,11 @@ def actuator_thread():
         # v_new = min(v_new, 0)  # Only go downward
         sfr.set_vel_mms(v_new)
 
-        out_str = "{:6.2f}{:}, err = {:6.2f}, errI = {:6.2f}, errD = {:7.2f}, gap = {:6.2f}, v = {:11.5f} : vP = {:6.2f}, vI = {:6.2f}, vD = {:6.2f}".format(
-            sfr.force,
-            sfr.units,
-            sfr.error,
-            sfr.int_error,
-            sfr.der_error,
-            gap_m * 1000,
-            v_new,
-            vel_P,
-            vel_I,
-            vel_D,
+        out_str = (
+            f"{sfr.force:6.2f}{sfr.units}, err = {sfr.error:6.2f}, "
+            + f"errI = {sfr.int_error:6.2f}, errD = {sfr.der_error:7.2f}, "
+            + f"gap = {gap_m * 1000:6.2f}mm, v = {v_new:11.5f} : vP = {vel_P:6.2f}, "
+            + f"vI = {vel_I:6.2f}, vD = {vel_D:6.2f}"
         )
         print(out_str)
 

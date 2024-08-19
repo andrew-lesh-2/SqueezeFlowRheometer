@@ -37,11 +37,8 @@ if __name__ == "__main__":
 
     output_file_name_base = (
         sfr.get_second_date_str()
-        + "_"
-        + (
-            f"constant_strain_rate_squeeze_flow_{sample_str}"
-            "_{round(sfr.sample_volume * 1e6):d}mL_{min_gap}mm"
-        )
+        + f"_constant_strain_rate_squeeze_flow_{sample_str}_"
+        + f"{round(sfr.sample_volume * 1e6):d}mL_{min_gap}mm"
     )
 
     sfr.data_file_name = output_file_name_base + "-data.csv"

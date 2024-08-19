@@ -230,9 +230,8 @@ class SqueezeFlowRheometer(OpenScale, TicActuator):
         )
         if "config" in gap_line.lower() or len(gap_line) <= 0:
             gap = float(scale.config["gap"])
-        else:
-            gap = SqueezeFlowRheometer.find_num_in_str(gap_line)
-        print("Starting gap is {:.2f}mm".format(gap))
+
+        print(f"Starting gap is {gap:.2f}mm")
         return gap
 
     @staticmethod

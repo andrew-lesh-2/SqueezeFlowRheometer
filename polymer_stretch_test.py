@@ -38,10 +38,8 @@ if __name__ == "__main__":
 
     output_file_name_base = (
         sfr.get_second_date_str()
-        + "_"
-        + "polymer_stretch_test_{:}_{:d}mL_{:d}mm".format(
-            sample_str, round(sfr.sample_volume * 1e6), round(target_gap)
-        )
+        + f"_polymer_stretch_test_{sample_str}_"
+        + f"{round(sfr.sample_volume * 1e6):d}mL_{round(target_gap):d}mm"
     )
 
     sfr.data_file_name = output_file_name_base + "-data.csv"
@@ -49,9 +47,11 @@ if __name__ == "__main__":
     sfr.create_figures_folder()
 
     sfr.create_data_file(
-        "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,Max Accel,Step Mode,Voltage In (mV),Current Force ({:}),Target Force ({:}),Start Gap (m),Current Gap (m),Viscosity (Pa.s),Yield Stress (Pa),Sample Volume (m^3),Viscosity Volume (m^3), Test Active?, Spread beyond hammer?\n".format(
-            sfr.units, sfr.units
-        )
+        "Current Time,Elapsed Time,Current Position (mm),Current Position,Target Position,"
+        + "Current Velocity (mm/s),Current Velocity,Target Velocity,Max Speed,Max Decel,Max Accel,"
+        + f"Step Mode,Voltage In (mV),Current Force ({sfr.units:}),Target Force ({sfr.units:}),"
+        + "Start Gap (m),Current Gap (m),Viscosity (Pa.s),Yield Stress (Pa),Sample Volume (m^3),"
+        + "Viscosity Volume (m^3), Test Active?, Spread beyond hammer?\n"
     )
 
 
