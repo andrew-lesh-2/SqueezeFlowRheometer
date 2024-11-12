@@ -15,8 +15,10 @@ class OpenScale:
     """Wrapper for interfacing with OpenScale board and getting calibrated
     force readings in coherent units from the load cell"""
 
-    OLD_READING_KEEP_AMOUNT = 2
+    OLD_READING_KEEP_AMOUNT = 10
     """How many old readings to keep"""
+    OUTLIER_QUORUM_AMOUNT = 5
+    """How many points must be within the outlier jump threshold of the new measurement for it to be considered not an outlier."""
     OUTLIER_JUMP_THRESHOLD = 10
     """The maximum acceptable jump in grams between two force readings"""
 
@@ -178,27 +180,27 @@ class OpenScale:
         return meas
 
     def check_if_outlier(self, measurement: float) -> bool:
-        """Checks if a measurement is too far from any of the previous stored values.
+        """Checks if a measurement is too far from enough previous stored values.
+        If it is within a certain threshold for at least the quorum amount of values, returns false. Otherwise returns true.
 
         Args:
-            measurement (float): _description_
+            measurement (float): the new measurement to check if it's an outlier
 
         Returns:
-            bool: True if it's an outlier (too far from prior measurements),
-            False if it's a real measurement
+            bool: True if it's an utlier (too far from prior measurements),
+                False if it's considered a real measurement.
         """
-        return not any(
-            (
-                (old is not None)  # make sure we're comparing to an actual value
-                and (
-                    abs(measurement - (old if old is not None else 0))
-                    <= OpenScale.OUTLIER_JUMP_THRESHOLD
-                )
-            )
-            for old in self.old_readings[
-                0:-1
-            ]  # don't include current reading, which is the last one in the list
-        )  # if it's too far from any of the previous readings
+
+        distance_from_old_measurement: list[float] = [
+            abs(measurement - (old if old is not None else 0))
+            for old in self.old_readings[0:-1]
+        ]
+        close_enough: list[bool] = [
+            d <= OpenScale.OUTLIER_JUMP_THRESHOLD for d in distance_from_old_measurement
+        ]
+        number_close_enough: int = sum(close_enough)
+        is_outlier = number_close_enough < OpenScale.OUTLIER_QUORUM_AMOUNT
+        return is_outlier
 
     @staticmethod
     def grams_to_N(f: float) -> float:
