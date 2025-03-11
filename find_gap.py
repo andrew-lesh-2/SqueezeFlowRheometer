@@ -16,7 +16,7 @@ date_str = date.strftime("%Y-%m-%d_%H-%M-%S")
 CSV_NAME = date_str + "_" + "find_gap" + "-data.csv"
 CONFIG_PATH = "LoadCell\\config.json"
 
-N_FIND = 25
+N_FIND =25
 
 force: float = 0
 """Current force reading. Positive is a force pushing up on the load cell"""
@@ -101,7 +101,7 @@ def actuator_thread():
     hit_pos = 0
 
     # Go to starting gap
-    actuator.move_to_mm(-abs(start_gap))
+    actuator.move_to_mm(-abs(0.1))  # setting to 0.1 mm to prevent 310 mm bug! (from printout of python 3.10)
     print("Reached start point. Now approaching to find the hard stop slowly.")
 
     # Start by approaching and waiting until force is non-negligible

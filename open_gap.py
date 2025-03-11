@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     # Move from start position to target gap
     print("Moving to zero gap.")
-    target_pos = -sfr.start_gap
+    target_pos = sfr.start_gap
 
     # Stop a little bit away
     first_stop = min(0, target_pos + 0.5)
